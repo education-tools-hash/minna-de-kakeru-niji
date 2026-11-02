@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>みんなでかける虹</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="app">
+    <section id="home" hidden>
+      <h1>みんなでかける虹</h1>
+      <p class="lead">ちがう動きが、ひとつの虹になる。</p>
+      <button id="create-room" class="primary">部屋をつくる（先生）</button>
+    </section>
+
+    <section id="teacher" hidden>
+      <h1>先生の画面</h1>
+      <p>子どもの端末で、次のアドレスを開いてください。</p>
+      <p class="join-url"><a id="join-url" target="_blank" rel="noopener"></a></p>
+      <p id="expires" class="note"></p>
+      <h2>参加している子ども</h2>
+      <ul id="role-list" class="role-list"></ul>
+      <h2>参加希望</h2>
+      <p id="full-message" class="note warn" hidden></p>
+      <ul id="request-list" class="request-list"></ul>
+      <p id="no-requests" class="note">参加希望はまだありません。</p>
+      <h2>状態</h2>
+      <p id="teacher-status" class="note"></p>
+      <button id="end-room" class="danger">活動を終える（部屋を削除）</button>
+    </section>
+
+    <section id="waiting" hidden>
+      <h1>みんなでかける虹</h1>
+      <p id="waiting-message" class="lead">先生が参加を承認するまで待ってください。</p>
+    </section>
+
+    <section id="child" hidden>
+      <div id="stage" class="stage" tabindex="0" role="button" aria-describedby="child-status">
+        <div class="light light-a" id="light-a" aria-hidden="true"></div>
+        <div class="light light-b" id="light-b" aria-hidden="true"></div>
+        <div class="rainbow" id="rainbow" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="pulse" id="pulse" aria-hidden="true"></div>
+      </div>
+      <p id="child-status" class="child-status" aria-live="polite"></p>
+    </section>
+
+    <section id="closed" hidden>
+      <h1>みんなでかける虹</h1>
+      <p class="lead">この部屋は終了したか、有効期限が切れました。</p>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "emulators",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["firebase", "emulators:start", "--only", "auth,database,hosting", "--project", "demo-niji"],
+      "port": 5050
+    }
+  ]
+}

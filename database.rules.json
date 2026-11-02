@@ -1,6 +1,74 @@
 {
   "rules": {
     ".read": false,
-    ".write": false
+    ".write": false,
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+        ".write": "auth != null && ((!data.exists() && newData.child('meta/ownerUid').val() == auth.uid && !newData.hasChild('roles') && !newData.hasChild('members') && !newData.hasChild('requests')) || (data.exists() && !newData.exists() && data.child('meta/ownerUid').val() == auth.uid))",
+        ".validate": "newData.hasChildren(['meta', 'counters'])",
+        "meta": {
+          ".read": "auth != null && (root.child('rooms').child($roomId).child('roles/a').val() == auth.uid || root.child('rooms').child($roomId).child('roles/b').val() == auth.uid) && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+          ".validate": "newData.hasChildren(['ownerUid', 'createdAt', 'expiresAt'])",
+          "ownerUid": {
+            ".validate": "newData.val() == data.val() || (!data.exists() && newData.isString() && newData.val() == auth.uid)"
+          },
+          "createdAt": {
+            ".validate": "newData.val() == data.val() || (!data.exists() && newData.isNumber() && newData.val() == now)"
+          },
+          "expiresAt": {
+            ".validate": "newData.val() == data.val() || (!data.exists() && newData.isNumber() && newData.val() > now && newData.val() <= newData.parent().child('createdAt').val() + 10800000)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "counters": {
+          ".read": "auth != null && (root.child('rooms').child($roomId).child('roles/a').val() == auth.uid || root.child('rooms').child($roomId).child('roles/b').val() == auth.uid) && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+          ".validate": "newData.hasChildren(['a', 'b'])",
+          "a": {
+            ".write": "auth != null && root.child('rooms').child($roomId).child('roles/a').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+            ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == 0) || (data.exists() && newData.val() == data.val() + 1 && data.val() <= root.child('rooms').child($roomId).child('counters/b').val()))"
+          },
+          "b": {
+            ".write": "auth != null && root.child('rooms').child($roomId).child('roles/b').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+            ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == 0) || (data.exists() && newData.val() == data.val() + 1 && data.val() <= root.child('rooms').child($roomId).child('counters/a').val()))"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "roles": {
+          ".read": "auth != null && (root.child('rooms').child($roomId).child('roles/a').val() == auth.uid || root.child('rooms').child($roomId).child('roles/b').val() == auth.uid) && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()",
+          "$role": {
+            ".write": "auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val() && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))",
+            ".validate": "($role == 'a' || $role == 'b') && newData.isString() && (newData.val() == data.val() || (!data.exists() && newData.val() != newData.parent().parent().child('meta/ownerUid').val() && root.child('rooms').child($roomId).child('requests').child(newData.val()).exists() && newData.parent().parent().child('members').child(newData.val()).val() == $role))"
+          }
+        },
+        "members": {
+          "$uid": {
+            ".read": "auth != null && auth.uid == $uid",
+            ".write": "auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val() && ((!data.exists() && newData.exists()) || (data.exists() && !newData.exists()))",
+            ".validate": "newData.isString() && newData.parent().parent().child('roles').child(newData.val()).val() == $uid"
+          }
+        },
+        "requests": {
+          "$uid": {
+            ".read": "auth != null && auth.uid == $uid",
+            ".write": "(auth != null && auth.uid == $uid && !data.exists() && newData.exists() && root.child('rooms').child($roomId).exists() && auth.uid != root.child('rooms').child($roomId).child('meta/ownerUid').val() && now < root.child('rooms').child($roomId).child('meta/expiresAt').val()) || (auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val() && data.exists() && !newData.exists())",
+            ".validate": "newData.hasChildren(['requestedAt'])",
+            "requestedAt": {
+              ".validate": "newData.val() == data.val() || (!data.exists() && newData.isNumber() && newData.val() == now)"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
   }
 }

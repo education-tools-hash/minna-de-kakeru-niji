@@ -169,9 +169,11 @@ describe('A. 役割と承認', () => {
 
   test('A8 作成者 uid の記録は誰も書き換えられない', async () => {
     await seed({ [ROOM]: roomData() });
-    for (const uid of [A, X, OWNER]) {
+    for (const uid of [A, X]) {
       await assertFails(ref(uid, roomPath('meta/ownerUid')).set(uid));
     }
+    await assertFails(ref(OWNER, roomPath('meta/ownerUid')).set(X));
+    expect(await readAsAdmin(roomPath('meta/ownerUid'))).toBe(OWNER);
   });
 
   test('A9 子ども A は他者の参加希望を承認できない', async () => {
@@ -267,6 +269,13 @@ describe('A. 役割と承認', () => {
     expect(await readAsAdmin(roomPath('counters/a'))).toBe(1);
     await assertFails(ref(A, roomPath('counters/a')).set(2));
     await assertSucceeds(ref(X, roomPath('counters/a')).set(2));
+  });
+  // 11月2日夜の実装中に見つかった穴への回帰テスト（追加・Nishio の承認待ち）
+  test('A19 教員は子どものカウンタを書けない（代理参加の防止）', async () => {
+    await seed({ [ROOM]: roomData({ a: 0, b: 1 }) });
+    await assertFails(ref(OWNER, roomPath('counters/a')).set(1));
+    await assertFails(ref(OWNER, roomPath()).update({ 'counters/a': 1 }));
+    expect(await readAsAdmin(roomPath('counters/a'))).toBe(0);
   });
 });
 

@@ -41,3 +41,25 @@ export const freeRole = (roles = {}) => ROLES.find((role) => !roles[role]) ?? nu
 
 export const approvalMessage = (roles) =>
   freeRole(roles) ? null : '満員のため承認できません（A・B とも参加中です）';
+
+// 参加の入力をまとめる。1回のジェスチャー・1回の押下を、1回の参加として数える。
+// タッチやマウスは pointerup の直後に click も発生させるため、直前に pointerup があった click は数えない。
+// click だけを送る入力（VoiceOver のダブルタップ、一部の注視クリック・スイッチ操作）は click で数える。
+export const CLICK_DEDUPE_MS = 700;
+
+export function createInputGate(windowMs = CLICK_DEDUPE_MS) {
+  let lastPointerUp = -Infinity;
+  return {
+    pointerUp(t) {
+      lastPointerUp = t;
+      return true;
+    },
+    click(t) {
+      return t - lastPointerUp >= windowMs;
+    },
+    // Space／Enter。押しっぱなしの自動リピートは数えない
+    key(repeat) {
+      return !repeat;
+    },
+  };
+}

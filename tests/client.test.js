@@ -1,10 +1,12 @@
 // クライアント側の確認（Rules の単体テストでは検証できない「表示」の部分）。
 // テスト番号は「Firebase 机上検証メモ v1.2」§3 に対応する。実機での見え方は E1〜E4 で別途確認する。
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
   approvalMessage,
   canContribute,
   createCelebrationTracker,
+  createInputGate,
   freeRole,
   jointCount,
   viewState,
@@ -51,5 +53,53 @@ describe('A6・B4 のクライアント側', () => {
     expect(viewState({ a: 0, b: 0 }, 'a')).toMatchObject({ joint: 0, rainbowComplete: false, mineWaiting: false });
     expect(viewState({ a: 1, b: 0 }, 'a')).toMatchObject({ joint: 0, mineWaiting: true });
     expect(viewState({ a: 2, b: 2 }, 'b')).toMatchObject({ joint: 2, mineWaiting: false, theirsWaiting: false });
+  });
+});
+
+// アクセシビリティ対応表（2026年11月2日確定）の 2・3・8 に対応する
+describe('入力の受け付け（対応表 2・3）', () => {
+  test('タッチ：pointerup と直後の click は、合わせて1回の参加', () => {
+    const gate = createInputGate();
+    expect(gate.pointerUp(1000)).toBe(true);
+    expect(gate.click(1010)).toBe(false);
+  });
+
+  test('click だけを送る入力（VoiceOver・注視クリック・スキャン）も1回の参加になる', () => {
+    const gate = createInputGate();
+    expect(gate.click(1000)).toBe(true);
+    expect(gate.click(3000)).toBe(true);
+  });
+
+  test('すばやい連続タップは、タップごとに1回ずつ（click では重ねて数えない）', () => {
+    const gate = createInputGate();
+    expect([gate.pointerUp(0), gate.click(10), gate.pointerUp(200), gate.click(210)]).toEqual([true, false, true, false]);
+  });
+
+  test('Space／Enter の押しっぱなし（自動リピート）は数えない', () => {
+    const gate = createInputGate();
+    expect(gate.key(false)).toBe(true);
+    expect(gate.key(true)).toBe(false);
+  });
+});
+
+describe('光の動き（対応表 5・6・8）', () => {
+  const css = readFileSync(new URL('../public/style.css', import.meta.url), 'utf8');
+
+  test('繰り返す動きはすべて周期2秒以上（速い点滅をしない）', () => {
+    const loops = [...css.matchAll(/animation:\s*[\w-]+\s+([\d.]+)s[^;]*infinite/g)];
+    expect(loops.length).toBeGreaterThanOrEqual(2);
+    for (const [, seconds] of loops) expect(Number(seconds)).toBeGreaterThanOrEqual(2);
+  });
+
+  test('自分の光は明るさの呼吸、相手の光は揺れ（動きの種類が違う）', () => {
+    expect(css).toMatch(/\.light\.held\s*{[^}]*animation:\s*breathe/);
+    expect(css).toMatch(/\.light\.inviting\s*{[^}]*animation:\s*sway/);
+    expect(css).toMatch(/@keyframes breathe\s*{[^}]*opacity/);
+    expect(css).toMatch(/@keyframes sway\s*{[^}]*translateX/);
+  });
+
+  test('「視差効果を減らす」では動きを止め、明るいまま静止する', () => {
+    const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
+    expect(reduced).toMatch(/\.light\.held,\s*\.light\.inviting\s*{[^}]*animation:\s*none[^}]*opacity:\s*0\.9/);
   });
 });

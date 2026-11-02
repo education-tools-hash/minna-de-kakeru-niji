@@ -46,38 +46,60 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   padding: 8px 12px; margin-bottom: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
 }
 
-/* 子どもの画面：画面全体が大きな操作領域。A は左（暖色）、B は右（寒色）で、色だけでなく位置でも区別する。 */
+/* 子どもの画面：画面全体がひとつの大きな参加エリア（対応表 1・3）。
+   A は左（暖色）、B は右（寒色）で、色だけでなく位置と動きでも区別する（対応表 7）。 */
+#child {
+  position: fixed;
+  inset: 0;
+}
 .stage {
-  position: relative;
-  height: min(70vh, 560px);
-  border-radius: 24px;
+  position: absolute;
+  inset: 0;
   background: #1f2433;
   overflow: hidden;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   outline: none;
 }
-.stage:focus-visible { box-shadow: 0 0 0 4px #fff, 0 0 0 8px var(--fg); }
+.stage:focus-visible { box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.6); }
 
-.light {
+.light, .spark {
   position: absolute;
   bottom: 12%;
-  width: 28%;
+  width: min(28vw, 40vh);
   aspect-ratio: 1;
   border-radius: 50%;
-  opacity: 0.15;
-  transition: opacity 0.8s ease, transform 0.8s ease;
+  pointer-events: none;
 }
-.light-a { left: 8%; background: radial-gradient(circle, var(--warm), transparent 70%); }
-.light-b { right: 8%; background: radial-gradient(circle, var(--cool), transparent 70%); }
-/* 参加済みで相手を待っている間は、穏やかに保持する */
-.light.held { opacity: 0.9; animation: breathe 3s ease-in-out infinite; }
-.light.flash { opacity: 1; transform: scale(1.12); }
+.light { opacity: 0.2; transition: opacity 0.8s ease; }
+.light-a, .spark-a { left: 6%; }
+.light-b, .spark-b { right: 6%; }
+.light-a { background: radial-gradient(circle, var(--warm), transparent 70%); }
+.light-b { background: radial-gradient(circle, var(--cool), transparent 70%); }
 
+/* 対応表 5：自分の光（参加済みで相手を待っている）は、明るさがゆっくり上下する呼吸で保持を示す */
+.light.held { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+/* 対応表 6：相手の光（相手が待っている）は、明るさは一定のまま、そっと左右に揺れて誘う */
+.light.inviting { opacity: 0.85; animation: sway 5s ease-in-out infinite; }
+@keyframes sway {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+/* 対応表 4：入力の瞬間の小さな光の反応。保持の動きとは別の要素なので、待機中でも必ず見える。
+   明るさは app.js が Web Animations で付ける（連続入力でも暗転を挟まない）。 */
+.spark {
+  opacity: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.35) 30%, transparent 55%);
 }
 
 .rainbow {
@@ -126,9 +148,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   100% { opacity: 0; transform: translate(-50%, 50%) scale(1.3); }
 }
 
-.child-status { font-size: 1.3rem; text-align: center; min-height: 2em; }
+.child-status {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  margin: 0;
+  font-size: 1.3rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .light.held { animation: none; }
+  .light.held, .light.inviting { animation: none; opacity: 0.9; }
   .pulse.play { animation-duration: 0.01s; }
 }

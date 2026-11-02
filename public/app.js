@@ -21,6 +21,7 @@ import {
   approvalMessage,
   canContribute,
   createCelebrationTracker,
+  createInputGate,
   freeRole,
   otherRole,
   viewState,
@@ -199,19 +200,26 @@ async function runChild(roomId, uid) {
 function runActivity(roomId, role) {
   show('child');
   const stage = $('stage');
+  const other = otherRole(role);
   const mineLight = $(`light-${role}`);
+  const theirLight = $(`light-${other}`);
+  const spark = $(`spark-${role}`);
   const rainbow = $('rainbow');
   const pulse = $('pulse');
   stage.setAttribute('aria-label', `${ROLE_LABEL[role]} の光を出す`);
+  // 役割が変わって再開した場合に備え、前の表示状態を消しておく
+  for (const light of [mineLight, theirLight]) light.classList.remove('held', 'inviting');
 
   let counters = null;
   let tracker = null;
   let writing = false;
+  const gate = createInputGate();
 
   function render(animate) {
     const state = viewState(counters, role);
-    $(`light-${role}`).classList.toggle('held', state.mineWaiting);
-    $(`light-${otherRole(role)}`).classList.toggle('held', state.theirsWaiting);
+    // 自分の光は呼吸（明るさ）、相手の光は揺れ（位置）で、動きの種類を分ける
+    mineLight.classList.toggle('held', state.mineWaiting);
+    theirLight.classList.toggle('inviting', state.theirsWaiting);
     rainbow.classList.toggle('no-anim', !animate);
     rainbow.classList.toggle('complete', state.rainbowComplete);
     $('child-status').textContent = state.mineWaiting
@@ -249,16 +257,19 @@ function runActivity(roomId, role) {
     pulse.classList.add('play');
   }
 
-  // 一人ひとりの入力には、毎回すぐに個別反応を返す
+  // 対応表 4：入力の瞬間に、自分の光の位置へ必ず小さな光を返す（参加として数えるかとは無関係）。
+  // 連続入力では、消えかけの光を今の明るさから明るくし直すだけで、暗転を挟まない（対応表 8）。
+  let sparkAnimation = null;
   function feedback() {
-    mineLight.classList.remove('flash');
-    void mineLight.offsetWidth;
-    mineLight.classList.add('flash');
-    setTimeout(() => mineLight.classList.remove('flash'), 400);
+    const from = Number(getComputedStyle(spark).opacity) || 0;
+    sparkAnimation?.cancel();
+    sparkAnimation = spark.animate(
+      [{ opacity: from }, { opacity: 1, offset: 0.12 }, { opacity: 0 }],
+      { duration: 700, easing: 'ease-out' },
+    );
   }
 
-  async function act() {
-    feedback();
+  async function contribute() {
     if (!counters || writing || !canContribute(counters, role)) return;
     writing = true;
     try {
@@ -270,25 +281,43 @@ function runActivity(roomId, role) {
     }
   }
 
-  // タップ・スワイプ・マウス：1回のジェスチャー（指やボタンを離した時点）を1回の参加とする
+  // タップ・スワイプ・マウス・スイッチコントロール：押した瞬間に反応し、離した時点で1回の参加とする
+  const onPointerDown = (e) => {
+    e.preventDefault();
+    feedback();
+  };
   const onPointerUp = (e) => {
     e.preventDefault();
-    act();
+    if (gate.pointerUp(e.timeStamp)) contribute();
   };
-  // キーボード・外部スイッチ（Space／Enter）。押しっぱなしの自動リピートは数えない
+  // click だけを送る入力（VoiceOver のダブルタップ、一部の注視クリック・スキャン）。
+  // タッチ直後の click は gate が除くので、二重には数えない。
+  const onClick = (e) => {
+    if (!gate.click(e.timeStamp)) return;
+    feedback();
+    contribute();
+  };
+  // キーボード・外部スイッチ（Space／Enter）。押しっぱなしの自動リピートは反応も参加も1回だけ
   const onKeyDown = (e) => {
     if (e.key !== ' ' && e.key !== 'Enter') return;
     e.preventDefault();
-    if (!e.repeat) act();
+    if (!gate.key(e.repeat)) return;
+    feedback();
+    contribute();
   };
+  stage.addEventListener('pointerdown', onPointerDown);
   stage.addEventListener('pointerup', onPointerUp);
+  stage.addEventListener('click', onClick);
   // フォーカスが外れていても外部スイッチが効くよう、ウィンドウ全体で受ける（Space のスクロールも抑止）
   window.addEventListener('keydown', onKeyDown);
   stage.focus();
 
   return () => {
     unsubscribe();
+    sparkAnimation?.cancel();
+    stage.removeEventListener('pointerdown', onPointerDown);
     stage.removeEventListener('pointerup', onPointerUp);
+    stage.removeEventListener('click', onClick);
     window.removeEventListener('keydown', onKeyDown);
   };
 }

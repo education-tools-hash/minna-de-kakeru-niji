@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {
+  browserLocalPersistence,
   browserSessionPersistence,
   connectAuthEmulator,
   initializeAuth,
@@ -24,28 +25,26 @@ import {
   otherRole,
   viewState,
 } from './logic.js';
+import { EMULATOR_CONFIG, PRODUCTION_CONFIG } from './firebase-config.js';
 
 const ROOM_LIFETIME = 3 * 60 * 60 * 1000;
 const EXPIRY_MARGIN = 60 * 1000;
 const ROLE_LABEL = { a: 'A', b: 'B' };
 
+// localhost ではエミュレータ（demo-niji）に、それ以外では本番に接続する
 const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
-if (!isLocal) {
-  document.body.textContent = '本番環境の設定はまだありません（エミュレータでのみ動作します）。';
-  throw new Error('production config not set');
-}
 
-const app = initializeApp({
-  apiKey: 'demo-key',
-  authDomain: 'demo-niji.firebaseapp.com',
-  projectId: 'demo-niji',
-  databaseURL: 'http://127.0.0.1:9000?ns=demo-niji-default-rtdb',
+const app = initializeApp(isLocal ? EMULATOR_CONFIG : PRODUCTION_CONFIG);
+// エミュレータではタブごとに別の匿名ユーザーにするためセッション単位で、
+// 本番では再読み込みや再接続でも同じ uid を保てるよう端末に保持する
+const auth = initializeAuth(app, {
+  persistence: isLocal ? browserSessionPersistence : browserLocalPersistence,
 });
-// エミュレータではタブごとに別の匿名ユーザーにするため、セッション単位で保持する
-const auth = initializeAuth(app, { persistence: browserSessionPersistence });
-connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
 const db = getDatabase(app);
-connectDatabaseEmulator(db, '127.0.0.1', 9000);
+if (isLocal) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectDatabaseEmulator(db, '127.0.0.1', 9000);
+}
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => {

@@ -39,4 +39,5 @@
 ## 開発の進め方
 - テスト：`npm run test:rules`（エミュレータ上の Security Rules テスト）、`npm run test:client`（クライアントの純粋ロジック）。
 - エミュレータ専用のプロジェクト ID `demo-niji` を使う（クラウドには接続しない）。
+- 本番（`minna-de-kakeru-niji`）へのデプロイは必ず `--project prod` を明示する。Rules → 照合 → `python3 scripts/prod_smoke.py` → Hosting の順。
 - 開発記録は `docs/dev-log.md` に書く。実際にあった提案と判断だけを記録し、存在しない提案や判断を作らない。

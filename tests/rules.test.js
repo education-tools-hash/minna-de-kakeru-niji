@@ -1,5 +1,5 @@
 // Security Rules の単体テスト（エミュレータ上で実行）。
-// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、11月2日に承認された追加分（A15〜A18・D7・D8）に対応する。
+// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、承認された追加分（11月2日：A15〜A19・D7・D8、11月3日：A20〜A24・D9〜D11）に対応する。
 // C1〜C3 と A6 の表示部分は Rules では検証できないため tests/client.test.js で確認する。
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
@@ -270,12 +270,58 @@ describe('A. 役割と承認', () => {
     await assertFails(ref(A, roomPath('counters/a')).set(2));
     await assertSucceeds(ref(X, roomPath('counters/a')).set(2));
   });
-  // 11月2日夜の実装中に見つかった穴への回帰テスト（追加・Nishio の承認待ち）
+  // 11月2日夜の実装中に見つかった穴への回帰テスト（11月2日夜に Nishio が追加を承認）
   test('A19 教員は子どものカウンタを書けない（代理参加の防止）', async () => {
     await seed({ [ROOM]: roomData({ a: 0, b: 1 }) });
     await assertFails(ref(OWNER, roomPath('counters/a')).set(1));
     await assertFails(ref(OWNER, roomPath()).update({ 'counters/a': 1 }));
     expect(await readAsAdmin(roomPath('counters/a'))).toBe(0);
+  });
+
+  // 以下 A20〜A24 は、11月2日夜の Rules テストの棚卸し（docs/rules-inventory.md）で担保が欠けていた操作。11月3日に Nishio が追加を承認
+  test('A20 参加者は別の部屋の meta・roles・requests を読めない', async () => {
+    await seed({
+      [ROOM]: roomData(),
+      [ROOM2]: roomData({ roles: { a: X, b: Y }, requests: { [OWNER]: { requestedAt: Date.now() } } }),
+    });
+    await assertFails(ref(A, roomPath('', ROOM2)).get());
+    await assertFails(ref(A, roomPath('meta', ROOM2)).get());
+    await assertFails(ref(A, roomPath('roles', ROOM2)).get());
+    await assertFails(ref(A, roomPath('requests', ROOM2)).get());
+  });
+
+  test('A21 参加者は別の部屋の役割・メンバー記録を書けない', async () => {
+    await seed({ [ROOM]: roomData(), [ROOM2]: roomData({ roles: {} }) });
+    await assertFails(ref(A, roomPath('roles/a', ROOM2)).set(A));
+    await assertFails(ref(A, roomPath(`members/${A}`, ROOM2)).set('a'));
+    expect(await readAsAdmin(roomPath('roles', ROOM2))).toBeNull();
+  });
+
+  test('A22 教員は子どものカウンタを削除・減算・0 に戻すことができない', async () => {
+    await seed({ [ROOM]: roomData({ a: 2, b: 2 }) });
+    await assertFails(ref(OWNER, roomPath('counters/a')).remove());
+    await assertFails(ref(OWNER, roomPath('counters/a')).set(1));
+    await assertFails(ref(OWNER, roomPath('counters')).set({ a: 0, b: 0 }));
+    await assertFails(ref(OWNER, roomPath()).update({ 'counters/a': 0 }));
+    expect(await readAsAdmin(roomPath('counters'))).toEqual({ a: 2, b: 2 });
+  });
+
+  test('A23 子どもは自分の役割・メンバー記録を消したり書き換えたりできない', async () => {
+    await seed({ [ROOM]: roomData() });
+    await assertFails(ref(A, roomPath('roles/a')).remove());
+    await assertFails(ref(A, roomPath(`members/${A}`)).remove());
+    await assertFails(ref(A, roomPath(`members/${A}`)).set('b'));
+    await assertFails(ref(A, roomPath()).update({ 'roles/a': null, 'roles/b': A, [`members/${A}`]: 'b' }));
+    expect(await readAsAdmin(roomPath('roles'))).toEqual({ a: A, b: B });
+  });
+
+  test('A24 子どもは meta を削除したり、有効期限を縮めたりできない', async () => {
+    await seed({ [ROOM]: roomData() });
+    const before = await readAsAdmin(roomPath('meta'));
+    await assertFails(ref(A, roomPath('meta')).remove());
+    await assertFails(ref(A, roomPath('meta/expiresAt')).remove());
+    await assertFails(ref(A, roomPath('meta/expiresAt')).set(Date.now() + 1000));
+    expect(await readAsAdmin(roomPath('meta'))).toEqual(before);
   });
 });
 
@@ -377,5 +423,30 @@ describe('D. 期限と終了', () => {
     await assertSucceeds(ref(OWNER, roomPath()).remove());
     await assertFails(ref(A, roomPath('counters/a')).set(2));
     await assertFails(ref(A, roomPath('counters/a')).set(0));
+  });
+
+  // 以下 D9〜D11 も棚卸しで担保が欠けていた操作（11月3日に Nishio が追加を承認）
+  test('D9 期限切れの部屋には参加希望を書けない', async () => {
+    await seed({ [ROOM]: roomData({ roles: {}, ...expired() }) });
+    await assertFails(ref(X, roomPath(`requests/${X}`)).set({ requestedAt: TS }));
+  });
+
+  test('D10 削除された部屋には参加希望を書けない（子どもの画面はこの拒否で終了を判断する）', async () => {
+    await seed({ [ROOM]: roomData({ roles: {} }) });
+    await assertSucceeds(ref(OWNER, roomPath()).remove());
+    await assertFails(ref(X, roomPath(`requests/${X}`)).set({ requestedAt: TS }));
+    expect(await readAsAdmin(roomPath())).toBeNull();
+  });
+
+  test('D11 期限切れの部屋では教員も参加希望を承認できない', async () => {
+    await seed({ [ROOM]: roomData({ roles: {}, requests: { [X]: { requestedAt: Date.now() - 5 * HOUR } }, ...expired() }) });
+    await assertFails(
+      ref(OWNER, roomPath()).update({
+        [`requests/${X}`]: null,
+        'roles/a': X,
+        [`members/${X}`]: 'a',
+      }),
+    );
+    expect(await readAsAdmin(roomPath('roles'))).toBeNull();
   });
 });

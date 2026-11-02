@@ -1,0 +1,15 @@
+{
+  "name": "minna-de-kakeru-niji",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only database --project demo-niji \"vitest run tests/rules.test.js\"",
+    "test:client": "vitest run tests/client.test.js",
+    "emulators": "firebase emulators:start --project demo-niji"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "vitest": "^3.2.7"
+  }
+}

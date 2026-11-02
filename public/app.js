@@ -167,7 +167,9 @@ async function requestToJoin(roomId, uid) {
       await set(ref(db, `rooms/${roomId}/requests/${uid}`), { requestedAt: serverTimestamp() });
     }
     return true;
-  } catch {
+  } catch (e) {
+    // 実機確認用：拒否・失敗の理由を終了画面に小さく出す（個人情報は含まない）
+    $('closed-detail').textContent = `確認用：${e.code ?? e.name ?? ''} ${e.message ?? ''}／部屋 ${roomId.length}文字`;
     return false;
   }
 }

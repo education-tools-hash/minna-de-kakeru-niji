@@ -10,8 +10,11 @@ import {
   createInputGate,
   freeRole,
   jointCount,
+  classifyJoinError,
+  endState,
   MAX_LAYERS,
   PHRASES,
+  retryDelay,
   rainbowView,
   statusPhrase,
   viewState,
@@ -187,5 +190,27 @@ describe('虹の見せ方（案A：描き直し＋積み重ね）', () => {
   test('「視差効果を減らす」では弧を描く動きを止める', () => {
     const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
     expect(reduced).toMatch(/\.rainbow path[^{]*{[^}]*transition:\s*none/);
+  });
+});
+
+describe('画面の状態の区別（初回に終了画面が出た件の修正）', () => {
+  test('参加希望の失敗：Rules の拒否だけが「参加できない」、通信の失敗は「つながっていない」（終了ではない）', () => {
+    expect(classifyJoinError({ code: 'PERMISSION_DENIED', message: 'Permission denied' })).toBe('unavailable');
+    expect(classifyJoinError(new Error('Client is offline'))).toBe('offline');
+    expect(classifyJoinError({ code: 'NETWORK_ERROR' })).toBe('offline');
+    expect(classifyJoinError(undefined)).toBe('offline');
+  });
+
+  test('再試行は2秒から倍々で、最大10秒', () => {
+    expect([0, 1, 2, 3, 9].map(retryDelay)).toEqual([2000, 4000, 8000, 10000, 10000]);
+  });
+
+  test('承認後：期限を過ぎたら「時間切れ」、部屋が消えたら「先生が終えた」、どちらでもなければ継続', () => {
+    const expiresAt = 1_000_000;
+    expect(endState({ counters: { a: 1, b: 1 }, expiresAt, now: 999_999 })).toBeNull();
+    expect(endState({ counters: { a: 1, b: 1 }, expiresAt, now: 1_000_000 })).toBe('expired');
+    expect(endState({ counters: null, expiresAt, now: 999_999 })).toBe('ended');
+    expect(endState({ counters: null, expiresAt, now: 1_000_001 })).toBe('expired');
+    expect(endState({ counters: null, expiresAt: null, now: 5 })).toBe('ended');
   });
 });

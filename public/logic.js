@@ -112,3 +112,19 @@ export function rainbowView(counters) {
     full,
   };
 }
+
+// 画面の状態の区別（11月3日の調査「初回に終了画面が出た件」の修正）。
+// 参加希望の失敗：Rules の拒否（部屋が無い・期限切れ・削除済み・先生自身の uid）だけを「参加できない」とし、
+// それ以外（通信の失敗）は「つながっていない」として自動で再試行する。終了とは判定しない。
+export const classifyJoinError = (e) => (e?.code === 'PERMISSION_DENIED' ? 'unavailable' : 'offline');
+
+// 再試行の間隔（ミリ秒）：2秒から倍々で、最大10秒
+export const retryDelay = (attempt) => Math.min(10000, 2000 * 2 ** Math.max(0, attempt));
+
+// 承認後の終了状態：サーバー時刻が有効期限を過ぎていれば「時間切れ」、部屋のデータが消えていれば「先生が終えた」。
+// 期限切れを先に判定する（期限切れ後の削除は「時間切れ」のまま）。
+export function endState({ counters, expiresAt, now }) {
+  if (expiresAt != null && now >= expiresAt) return 'expired';
+  if (counters === null) return 'ended';
+  return null;
+}

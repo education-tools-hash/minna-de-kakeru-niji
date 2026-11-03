@@ -20,13 +20,16 @@ import {
 import {
   approvalMessage,
   canContribute,
+  classifyJoinError,
   createAnnouncer,
+  endState,
   createCelebrationTracker,
   createInputGate,
   freeRole,
   MAX_LAYERS,
   otherRole,
   rainbowView,
+  retryDelay,
   statusPhrase,
   viewState,
 } from './logic.js';
@@ -56,19 +59,27 @@ const $ = (id) => document.getElementById(id);
 const show = (id) => {
   for (const section of document.querySelectorAll('main > section')) section.hidden = section.id !== id;
 };
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const connecting = (message = 'つないでいます…') => {
+  $('connecting-message').textContent = message;
+  show('connecting');
+};
 
 // 推測困難な部屋ID（英小文字＋数字24文字、約124ビット）
 function newRoomId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => (b % 36).toString(36)).join('');
 }
 
+let serverOffset = 0;
 async function serverNow() {
   // .info は get() で読めないため、一度だけ購読して受け取る
-  const offset = await new Promise((resolve) =>
+  serverOffset = await new Promise((resolve) =>
     onValue(ref(db, '.info/serverTimeOffset'), (snap) => resolve(snap.val() ?? 0), { onlyOnce: true }),
   );
-  return Date.now() + offset;
+  return Date.now() + serverOffset;
 }
+// 直近に取得したずれを使った、同期的なサーバー時刻の見積もり（終了判定を同期的に行うため）
+const nowEstimate = () => Date.now() + serverOffset;
 
 // ---- 先生 ----
 
@@ -93,11 +104,14 @@ function runTeacher(roomId) {
   $('join-url').href = joinUrl;
   $('join-url').textContent = joinUrl;
 
+  let hadRoom = false;
   onValue(
     ref(db, `rooms/${roomId}`),
     (snap) => {
       const room = snap.val();
-      if (!room) return show('closed');
+      // 部屋が消えた：先生自身の終了操作（ended）。期限切れは読み取り拒否として下のエラー側に来る
+      if (!room) return show('ended');
+      hadRoom = true;
       const roles = room.roles ?? {};
       const requests = Object.keys(room.requests ?? {});
       const counters = room.counters ?? { a: 0, b: 0 };
@@ -155,7 +169,15 @@ function runTeacher(roomId) {
         (state.mineWaiting ? '・A が B を待っています' : '') +
         (state.theirsWaiting ? '・B が A を待っています' : '');
     },
-    () => show('closed'),
+    () => {
+      // 読み取り拒否：一度も読めていなければ作成者ではない（先生用アドレスを別の端末で開いた）。
+      // 読めていた部屋が拒否されたなら期限切れ。
+      if (hadRoom) return show('expired');
+      const childUrl = `${location.origin}${location.pathname}?room=${roomId}`;
+      $('child-link').href = childUrl;
+      $('child-link').textContent = childUrl;
+      show('not-teacher');
+    },
   );
 
   $('speech-toggle').onchange = (e) => set(ref(db, `rooms/${roomId}/meta/speech`), e.target.checked);
@@ -163,7 +185,7 @@ function runTeacher(roomId) {
   $('end-room').onclick = async () => {
     if (!confirm('活動を終えて、部屋のデータを削除しますか？')) return;
     await remove(ref(db, `rooms/${roomId}`));
-    show('closed');
+    show('ended');
   };
 }
 
@@ -178,45 +200,72 @@ const unlockSpeech = (e) => {
 };
 for (const type of ['pointerup', 'click', 'keydown']) document.addEventListener(type, unlockSpeech, true);
 
-// 参加希望を出す（出していなければ）。部屋が削除・期限切れなら Rules に拒否されるので false を返す。
+// 参加希望を出す（出していなければ）。
+// Rules に拒否された（部屋が無い・期限切れ・削除済み・先生自身の uid）ときだけ 'unavailable' を返す。
+// 通信の失敗は「つながっていない」として、つながるまで自動で再試行する（終了とは判定しない）。
 async function requestToJoin(roomId, uid) {
-  try {
-    const mine = await get(ref(db, `rooms/${roomId}/requests/${uid}`));
-    const member = await get(ref(db, `rooms/${roomId}/members/${uid}`));
-    if (!mine.exists() && !member.exists()) {
-      await set(ref(db, `rooms/${roomId}/requests/${uid}`), { requestedAt: serverTimestamp() });
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const mine = await get(ref(db, `rooms/${roomId}/requests/${uid}`));
+      const member = await get(ref(db, `rooms/${roomId}/members/${uid}`));
+      if (!mine.exists() && !member.exists()) {
+        await set(ref(db, `rooms/${roomId}/requests/${uid}`), { requestedAt: serverTimestamp() });
+      }
+      return 'ok';
+    } catch (e) {
+      if (classifyJoinError(e) === 'unavailable') return 'unavailable';
+      connecting('つながっていません。そのままお待ちください…');
+      await sleep(retryDelay(attempt));
     }
-    return true;
-  } catch (e) {
-    // 実機確認用：拒否・失敗の理由を終了画面に小さく出す（個人情報は含まない）
-    $('closed-detail').textContent = `確認用：${e.code ?? e.name ?? ''} ${e.message ?? ''}／部屋 ${roomId.length}文字`;
-    return false;
   }
 }
 
 async function runChild(roomId, uid) {
+  connecting();
+  if ((await requestToJoin(roomId, uid)) !== 'ok') return show('unavailable');
   show('waiting');
-  if (!(await requestToJoin(roomId, uid))) return show('closed');
 
   let stopActivity = null;
   let hadRole = false;
+  let hadRequest = false;
+  const shared = { expiresAt: null }; // 活動中に読めた有効期限（終了の区別に使う）
   onValue(ref(db, `rooms/${roomId}/members/${uid}`), async (snap) => {
     stopActivity?.();
     stopActivity = null;
     const role = snap.val();
     if (role) {
       hadRole = true;
-      stopActivity = runActivity(roomId, role);
+      stopActivity = runActivity(roomId, role, shared);
       return;
     }
     if (!hadRole) return show('waiting');
-    // 役割を失った：先生による解除なら参加希望を出し直して再承認を待つ。部屋の終了なら拒否される。
+    // 役割を失った：先生による解除なら参加希望を出し直して再承認を待つ。
+    // 拒否されたなら部屋が消えた（先生が終えた）か期限切れなので、その区別を表示する
     hadRole = false;
-    show((await requestToJoin(roomId, uid)) ? 'waiting' : 'closed');
+    if ((await requestToJoin(roomId, uid)) === 'ok') return show('waiting');
+    show(endState({ counters: null, expiresAt: shared.expiresAt, now: nowEstimate() }));
   });
+  // 参加希望が消えたのに役割が付かない：先生が見送ったか、部屋が消えた。承認待ちのまま止まらないようにする
+  onValue(
+    ref(db, `rooms/${roomId}/requests/${uid}`),
+    (snap) => {
+      if (snap.exists()) {
+        hadRequest = true;
+        return;
+      }
+      if (!hadRequest) return;
+      hadRequest = false;
+      // 承認待ちの画面のときだけ切り替える（終了・時間切れの表示を上書きしない。
+      // 拒否された書き込みも一瞬ローカルに現れてから消えるため、ここに来ることがある）
+      setTimeout(() => {
+        if (!hadRole && !stopActivity && !$('waiting').hidden) show('unavailable');
+      }, 1500);
+    },
+    () => {},
+  );
 }
 
-function runActivity(roomId, role) {
+function runActivity(roomId, role, shared = {}) {
   show('child');
   const stage = $('stage');
   const other = otherRole(role);
@@ -233,7 +282,33 @@ function runActivity(roomId, role) {
   let tracker = null;
   let announcer = null;
   let writing = false;
+  let stopped = false;
+  let expiresAt = null;
+  let expiryTimer = null;
   const gate = createInputGate();
+
+  // 終了の区別：有効期限（meta、承認後は読める）を過ぎたら「時間切れ」、部屋が消えたら「先生が終えた」
+  function finish(kind) {
+    if (stopped) return;
+    show(kind);
+  }
+  function checkEnd(nextCounters) {
+    const kind = endState({ counters: nextCounters, expiresAt, now: nowEstimate() });
+    if (kind) finish(kind);
+  }
+  serverNow(); // 時刻のずれを更新しておく
+  const unsubscribeExpiry = onValue(
+    ref(db, `rooms/${roomId}/meta/expiresAt`),
+    async (snap) => {
+      expiresAt = snap.val();
+      shared.expiresAt = expiresAt;
+      clearTimeout(expiryTimer);
+      if (expiresAt == null) return;
+      const remaining = expiresAt - (await serverNow());
+      expiryTimer = setTimeout(() => checkEnd(counters), Math.max(0, remaining) + 500);
+    },
+    () => {}, // 読めなくなった理由は counters 側で判定する
+  );
 
   // 先生側の読み上げオン／オフに従う
   const unsubscribeSpeech = onValue(
@@ -259,7 +334,7 @@ function runActivity(roomId, role) {
     ref(db, `rooms/${roomId}/counters`),
     (snap) => {
       const next = snap.val();
-      if (!next) return show('closed');
+      if (!next) return checkEnd(null);
       counters = next;
       const joint = Math.min(counters.a, counters.b);
       if (!tracker) {
@@ -272,7 +347,9 @@ function runActivity(roomId, role) {
       render(true);
       if (fresh > 0 && joint > 1) playPulse();
     },
-    () => show('closed'),
+    // 読み取り拒否：承認済みの読み取りが拒否されるのは期限切れのとき。役割の解除なら members 側の購読が先に
+    // 活動を止める（stopped）ので、少し待ってから判定する
+    () => setTimeout(() => checkEnd(counters), 800),
   );
 
   // 虹の弧（SVG）。暖色の3本は左から、寒色の4本は右から描く。pathLength=1 なので dashoffset 1→0 で描かれる
@@ -395,7 +472,10 @@ function runActivity(roomId, role) {
   stage.focus();
 
   return () => {
+    stopped = true;
+    clearTimeout(expiryTimer);
     unsubscribe();
+    unsubscribeExpiry();
     unsubscribeSpeech();
     speaker.stop();
     sparkAnimation?.cancel();
@@ -408,7 +488,19 @@ function runActivity(roomId, role) {
 
 // ---- 起動 ----
 
-const { user } = await signInAnonymously(auth);
+// 匿名ログイン。失敗（通信）したら「つないでいます」のまま再試行する（今までは真っ白だった）
+async function signIn() {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return (await signInAnonymously(auth)).user;
+    } catch {
+      connecting('つながっていません。そのままお待ちください…');
+      await sleep(retryDelay(attempt));
+    }
+  }
+}
+connecting();
+const user = await signIn();
 const params = new URLSearchParams(location.search);
 const roomId = params.get('room');
 

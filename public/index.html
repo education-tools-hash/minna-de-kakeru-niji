@@ -18,6 +18,7 @@
       <h1>先生の画面</h1>
       <p>子どもの端末で、次のアドレスを開いてください。</p>
       <p class="join-url"><a id="join-url" target="_blank" rel="noopener"></a></p>
+      <p class="note warn">子どもの端末には、<strong>この画面のリンク</strong>を渡してください。アドレスバーの URL（末尾に <code>&amp;teacher=1</code> が付いたもの）ではなく、画面のリンクです。アドレスバーの URL を渡すと、子どもの端末では開けません。</p>
       <p id="expires" class="note"></p>
       <h2>参加している子ども</h2>
       <ul id="role-list" class="role-list"></ul>
@@ -31,6 +32,11 @@
       <label class="toggle"><input type="checkbox" id="speech-toggle"> 子どもの端末で、状態の言葉（ひかったね／あなたの ばんだよ／にじが できたよ）を声でも伝える</label>
       <p class="note">音声は補助です。オフにしても、光と文字で活動は成立します。iPad では、子どもの端末を一度タップしてから読み上げが始まります。</p>
       <button id="end-room" class="danger">活動を終える（部屋を削除）</button>
+    </section>
+
+    <section id="connecting" hidden>
+      <h1>みんなでかける虹</h1>
+      <p id="connecting-message" class="lead">つないでいます…</p>
     </section>
 
     <section id="waiting" hidden>
@@ -50,10 +56,28 @@
       </div>
     </section>
 
-    <section id="closed" hidden>
+    <section id="unavailable" hidden>
       <h1>みんなでかける虹</h1>
-      <p class="lead">この部屋は終了したか、有効期限が切れました。</p>
-      <p id="closed-detail" class="note"></p>
+      <p class="lead">この部屋には参加できません。</p>
+      <p class="note">アドレスを確かめてください。先生の画面に出ているリンクを、そのまま開く必要があります。</p>
+    </section>
+
+    <section id="ended" hidden>
+      <h1>みんなでかける虹</h1>
+      <p class="lead">先生が活動を終えました。</p>
+    </section>
+
+    <section id="expired" hidden>
+      <h1>みんなでかける虹</h1>
+      <p class="lead">時間切れです。</p>
+      <p class="note">この部屋の時間（3時間）が終わりました。続けるときは、先生が新しい部屋をつくります。</p>
+    </section>
+
+    <section id="not-teacher" hidden>
+      <h1>みんなでかける虹</h1>
+      <p class="lead">この端末では先生の画面を開けません。</p>
+      <p class="note">先生の画面は、部屋をつくった端末でだけ開けます（部屋の時間が終わったあとも開けません）。子どもとして参加するときは、次のアドレスを開いてください。</p>
+      <p class="join-url"><a id="child-link"></a></p>
     </section>
   </main>
   <script type="module" src="app.js"></script>

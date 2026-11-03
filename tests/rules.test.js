@@ -1,5 +1,5 @@
 // Security Rules の単体テスト（エミュレータ上で実行）。
-// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、承認された追加分（11月2日：A15〜A19・D7・D8、11月3日：A20〜A24・D9〜D11、同日夜：A25・A26・D12 読み上げ設定）に対応する。
+// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、承認された追加分（11月2日：A15〜A19・D7・D8、11月3日：A20〜A24・D9〜D11、同日夜：A25・A26・D12 読み上げ設定、A27・A28・D13 終了の明示）に対応する。
 // C1〜C3 と A6 の表示部分は Rules では検証できないため tests/client.test.js で確認する。
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
@@ -348,6 +348,25 @@ describe('A. 役割と承認', () => {
     await assertFails(ref(OWNER, roomPath('meta')).update({ speech: true, expiresAt: Date.now() + 24 * HOUR }));
     expect(await readAsAdmin(roomPath('meta/speech'))).toBe(true);
   });
+
+  // 終了の明示（meta/endedAt）。11月3日夜に Nishio が承認した追加分
+  test('A27 教員は活動を終えるとき meta/endedAt にサーバー時刻を書ける（一度だけ）', async () => {
+    await seed({ [ROOM]: roomData() });
+    await assertSucceeds(ref(OWNER, roomPath('meta/endedAt')).set(TS));
+    expect(typeof (await readAsAdmin(roomPath('meta/endedAt')))).toBe('number');
+    await assertFails(ref(OWNER, roomPath('meta/endedAt')).set(TS)); // 二度目は書けない
+    await assertFails(ref(OWNER, roomPath('meta/endedAt')).remove());
+  });
+
+  test('A28 子ども・第三者は meta/endedAt を書けず、数値以外や過去の時刻は教員でも拒否される', async () => {
+    await seed({ [ROOM]: roomData() });
+    await assertFails(ref(A, roomPath('meta/endedAt')).set(TS));
+    await assertFails(ref(X, roomPath('meta/endedAt')).set(TS));
+    await assertFails(ref(OWNER, roomPath('meta/endedAt')).set('now'));
+    await assertFails(ref(OWNER, roomPath('meta/endedAt')).set(Date.now() - 60 * 1000));
+    await assertFails(ref(OWNER, roomPath('meta')).update({ endedAt: TS, expiresAt: Date.now() + 24 * HOUR }));
+    expect(await readAsAdmin(roomPath('meta/endedAt'))).toBeNull();
+  });
 });
 
 describe('B. min 方式の増分条件', () => {
@@ -479,5 +498,11 @@ describe('D. 期限と終了', () => {
     await seed({ [ROOM]: roomData(expired()) });
     await assertFails(ref(OWNER, roomPath('meta/speech')).set(false));
     expect(await readAsAdmin(roomPath('meta/speech'))).toBeNull();
+  });
+
+  test('D13 期限切れの部屋では教員も meta/endedAt を書けない（削除はできる）', async () => {
+    await seed({ [ROOM]: roomData(expired()) });
+    await assertFails(ref(OWNER, roomPath('meta/endedAt')).set(TS));
+    await assertSucceeds(ref(OWNER, roomPath()).remove());
   });
 });

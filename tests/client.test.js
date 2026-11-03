@@ -16,6 +16,7 @@ import {
   PHRASES,
   retryDelay,
   rainbowView,
+  roleLossScreen,
   statusPhrase,
   viewState,
 } from '../public/logic.js';
@@ -212,5 +213,20 @@ describe('画面の状態の区別（初回に終了画面が出た件の修正�
     expect(endState({ counters: null, expiresAt, now: 999_999 })).toBe('ended');
     expect(endState({ counters: null, expiresAt, now: 1_000_001 })).toBe('expired');
     expect(endState({ counters: null, expiresAt: null, now: 5 })).toBe('ended');
+  });
+});
+
+describe('役割を失ったときの画面（先生が終えた／解除／時間切れ）', () => {
+  const expiresAt = 1_000_000;
+  test('先生が終えた合図（endedAt）を受け取っていれば、参加希望を出し直さず「先生が活動を終えました」', () => {
+    expect(roleLossScreen({ endedAt: 999_000, rejoin: undefined, expiresAt, now: 999_500 })).toBe('ended');
+    expect(roleLossScreen({ endedAt: 999_000, rejoin: 'ok', expiresAt, now: 999_500 })).toBe('ended');
+  });
+  test('合図がなく参加希望が通れば「解除された」（部屋は存在する）', () => {
+    expect(roleLossScreen({ endedAt: null, rejoin: 'ok', expiresAt, now: 999_500 })).toBe('released');
+  });
+  test('合図がなく参加希望が拒否されたら、期限内なら「先生が終えた」、期限後なら「時間切れ」', () => {
+    expect(roleLossScreen({ endedAt: null, rejoin: 'unavailable', expiresAt, now: 999_500 })).toBe('ended');
+    expect(roleLossScreen({ endedAt: null, rejoin: 'unavailable', expiresAt, now: 1_000_001 })).toBe('expired');
   });
 });

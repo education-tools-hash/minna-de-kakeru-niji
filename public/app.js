@@ -30,6 +30,7 @@ import {
   otherRole,
   rainbowView,
   retryDelay,
+  roleLossScreen,
   statusPhrase,
   viewState,
 } from './logic.js';
@@ -184,6 +185,13 @@ function runTeacher(roomId) {
 
   $('end-room').onclick = async () => {
     if (!confirm('活動を終えて、部屋のデータを削除しますか？')) return;
+    // 先に「終えた」合図（meta/endedAt）を書いてから削除する。承認済みの子どもは削除より先にこの合図を受け取る。
+    // 期限切れ後は合図を書けない（Rules）が、削除はできるので続ける
+    try {
+      await set(ref(db, `rooms/${roomId}/meta/endedAt`), serverTimestamp());
+    } catch {
+      // 期限切れなど。子どもの画面は期限から「時間切れ」を判定する
+    }
     await remove(ref(db, `rooms/${roomId}`));
     show('ended');
   };
@@ -228,7 +236,7 @@ async function runChild(roomId, uid) {
   let stopActivity = null;
   let hadRole = false;
   let hadRequest = false;
-  const shared = { expiresAt: null }; // 活動中に読めた有効期限（終了の区別に使う）
+  const shared = { expiresAt: null, endedAt: null }; // 活動中に読めた有効期限と「終えた」合図（終了の区別に使う）
   onValue(ref(db, `rooms/${roomId}/members/${uid}`), async (snap) => {
     stopActivity?.();
     stopActivity = null;
@@ -239,11 +247,11 @@ async function runChild(roomId, uid) {
       return;
     }
     if (!hadRole) return show('waiting');
-    // 役割を失った：先生による解除なら参加希望を出し直して再承認を待つ。
-    // 拒否されたなら部屋が消えた（先生が終えた）か期限切れなので、その区別を表示する
+    // 役割を失った：先生の「終えた」合図を受け取っていれば終了。なければ参加希望を出し直し、
+    // 通れば解除（再承認を待つ）、拒否されたら期限から「先生が終えた」か「時間切れ」かを決める
     hadRole = false;
-    if ((await requestToJoin(roomId, uid)) === 'ok') return show('waiting');
-    show(endState({ counters: null, expiresAt: shared.expiresAt, now: nowEstimate() }));
+    const rejoin = shared.endedAt == null ? await requestToJoin(roomId, uid) : undefined;
+    show(roleLossScreen({ endedAt: shared.endedAt, rejoin, expiresAt: shared.expiresAt, now: nowEstimate() }));
   });
   // 参加希望が消えたのに役割が付かない：先生が見送ったか、部屋が消えた。承認待ちのまま止まらないようにする
   onValue(
@@ -258,7 +266,7 @@ async function runChild(roomId, uid) {
       // 承認待ちの画面のときだけ切り替える（終了・時間切れの表示を上書きしない。
       // 拒否された書き込みも一瞬ローカルに現れてから消えるため、ここに来ることがある）
       setTimeout(() => {
-        if (!hadRole && !stopActivity && !$('waiting').hidden) show('unavailable');
+        if (!hadRole && !stopActivity && (!$('waiting').hidden || !$('released').hidden)) show('unavailable');
       }, 1500);
     },
     () => {},
@@ -297,6 +305,12 @@ function runActivity(roomId, role, shared = {}) {
     if (kind) finish(kind);
   }
   serverNow(); // 時刻のずれを更新しておく
+  // 先生の「終えた」合図。削除より先に届くので、役割が消えたときの判定に使う
+  const unsubscribeEnded = onValue(
+    ref(db, `rooms/${roomId}/meta/endedAt`),
+    (snap) => { shared.endedAt = snap.val(); },
+    () => {},
+  );
   const unsubscribeExpiry = onValue(
     ref(db, `rooms/${roomId}/meta/expiresAt`),
     async (snap) => {
@@ -475,6 +489,7 @@ function runActivity(roomId, role, shared = {}) {
     stopped = true;
     clearTimeout(expiryTimer);
     unsubscribe();
+    unsubscribeEnded();
     unsubscribeExpiry();
     unsubscribeSpeech();
     speaker.stop();

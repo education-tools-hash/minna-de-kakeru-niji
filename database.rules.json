@@ -23,6 +23,10 @@
             ".write": "auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val() && newData.exists()",
             ".validate": "newData.isBoolean()"
           },
+          "endedAt": {
+            ".write": "auth != null && root.child('rooms').child($roomId).child('meta/ownerUid').val() == auth.uid && now < root.child('rooms').child($roomId).child('meta/expiresAt').val() && !data.exists() && newData.exists()",
+            ".validate": "newData.isNumber() && newData.val() == now"
+          },
           "$other": {
             ".validate": false
           }

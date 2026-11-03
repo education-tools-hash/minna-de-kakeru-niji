@@ -128,3 +128,12 @@ export function endState({ counters, expiresAt, now }) {
   if (counters === null) return 'ended';
   return null;
 }
+
+// 役割を失ったときの画面（11月3日夜の追加調査の修正）。
+// 先生が「活動を終える」で meta/endedAt を書いてから削除するので、それを受け取っていれば「先生が終えた」。
+// 受け取っていなければ参加希望を出し直し、通れば「解除された」（部屋は存在する）、拒否されれば期限から終了の種類を決める。
+export function roleLossScreen({ endedAt, rejoin, expiresAt, now }) {
+  if (endedAt != null) return 'ended';
+  if (rejoin === 'ok') return 'released';
+  return endState({ counters: null, expiresAt, now });
+}

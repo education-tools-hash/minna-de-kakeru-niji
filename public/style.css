@@ -164,3 +164,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   .light.held, .light.inviting { animation: none; opacity: 0.9; }
   .pulse.play { animation-duration: 0.01s; }
 }
+
+/* 先生画面：読み上げのオン／オフ */
+.toggle { display: flex; gap: .6em; align-items: flex-start; font-size: 1.05rem; line-height: 1.5; }
+.toggle input { width: 1.4em; height: 1.4em; flex: none; margin-top: .15em; }

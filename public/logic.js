@@ -63,3 +63,32 @@ export function createInputGate(windowMs = CLICK_DEDUPE_MS) {
     },
   };
 }
+
+// 子ども画面の状態の言葉（11月3日に Nishio が確定）。短い言葉だけにし、読み上げにも使う。
+// start（最初の状態）は文字だけで、読み上げない。
+export const PHRASES = {
+  mine: 'できた！',
+  theirs: 'あなたの ばんだよ',
+  complete: 'にじが できたよ',
+  start: 'ひかりを だそう',
+};
+const SPOKEN = new Set([PHRASES.mine, PHRASES.theirs, PHRASES.complete]);
+
+export function statusPhrase(state) {
+  if (state.mineWaiting) return PHRASES.mine;
+  if (state.theirsWaiting) return PHRASES.theirs;
+  if (state.rainbowComplete) return PHRASES.complete;
+  return PHRASES.start;
+}
+
+// 読み上げは「状態が変わったときに1回だけ」。読み込み時点の言葉は既に伝えたものとして扱い、読まない。
+export function createAnnouncer(initialPhrase) {
+  let last = initialPhrase;
+  return {
+    next(phrase) {
+      if (phrase === last) return null;
+      last = phrase;
+      return SPOKEN.has(phrase) ? phrase : null;
+    },
+  };
+}

@@ -20,12 +20,15 @@ import {
 import {
   approvalMessage,
   canContribute,
+  createAnnouncer,
   createCelebrationTracker,
   createInputGate,
   freeRole,
   otherRole,
+  statusPhrase,
   viewState,
 } from './logic.js';
+import { createSpeaker } from './speech.js';
 import { EMULATOR_CONFIG, PRODUCTION_CONFIG } from './firebase-config.js';
 
 const ROOM_LIFETIME = 3 * 60 * 60 * 1000;
@@ -74,6 +77,7 @@ async function createRoom(uid) {
       ownerUid: uid,
       createdAt: serverTimestamp(),
       expiresAt: (await serverNow()) + ROOM_LIFETIME - EXPIRY_MARGIN,
+      speech: true, // 読み上げは初期値オン（先生が切り替えられる）
     },
     counters: { a: 0, b: 0 },
   });
@@ -95,6 +99,8 @@ function runTeacher(roomId) {
       const roles = room.roles ?? {};
       const requests = Object.keys(room.requests ?? {});
       const counters = room.counters ?? { a: 0, b: 0 };
+      // 読み上げ設定（未設定の古い部屋はオン扱い）
+      $('speech-toggle').checked = room.meta.speech !== false;
       $('expires').textContent = `有効期限：${new Date(room.meta.expiresAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} まで`;
 
       $('role-list').replaceChildren(
@@ -150,6 +156,8 @@ function runTeacher(roomId) {
     () => show('closed'),
   );
 
+  $('speech-toggle').onchange = (e) => set(ref(db, `rooms/${roomId}/meta/speech`), e.target.checked);
+
   $('end-room').onclick = async () => {
     if (!confirm('活動を終えて、部屋のデータを削除しますか？')) return;
     await remove(ref(db, `rooms/${roomId}`));
@@ -158,6 +166,15 @@ function runTeacher(roomId) {
 }
 
 // ---- 子ども ----
+
+// 読み上げ。iPad Safari では一度ユーザー操作の中で有効化が必要なので、
+// 待機画面も含め、ページ上のどの操作（タップ・click・Space／Enter）でも解除する。
+const speaker = createSpeaker();
+const unlockSpeech = (e) => {
+  if (e.type === 'keydown' && e.key !== ' ' && e.key !== 'Enter') return;
+  speaker.unlock();
+};
+for (const type of ['pointerup', 'click', 'keydown']) document.addEventListener(type, unlockSpeech, true);
 
 // 参加希望を出す（出していなければ）。部屋が削除・期限切れなら Rules に拒否されるので false を返す。
 async function requestToJoin(roomId, uid) {
@@ -212,8 +229,16 @@ function runActivity(roomId, role) {
 
   let counters = null;
   let tracker = null;
+  let announcer = null;
   let writing = false;
   const gate = createInputGate();
+
+  // 先生側の読み上げオン／オフに従う
+  const unsubscribeSpeech = onValue(
+    ref(db, `rooms/${roomId}/meta/speech`),
+    (snap) => speaker.setEnabled(snap.val() !== false),
+    () => {}, // 役割の解除や終了で読めなくなった場合は counters 側の購読が画面を切り替える
+  );
 
   function render(animate) {
     const state = viewState(counters, role);
@@ -222,13 +247,11 @@ function runActivity(roomId, role) {
     theirLight.classList.toggle('inviting', state.theirsWaiting);
     rainbow.classList.toggle('no-anim', !animate);
     rainbow.classList.toggle('complete', state.rainbowComplete);
-    $('child-status').textContent = state.mineWaiting
-      ? 'あなたの光が待っています'
-      : state.theirsWaiting
-        ? 'ともだちの光が待っています'
-        : state.rainbowComplete
-          ? `虹ができました（${state.joint}）`
-          : '光を出してみよう';
+    const phrase = statusPhrase(state);
+    $('child-status').textContent = phrase;
+    // 読み上げは状態が変わったときに1回だけ。読み込み時点の言葉は読まない
+    if (!announcer) announcer = createAnnouncer(phrase);
+    else speaker.say(announcer.next(phrase));
   }
 
   const unsubscribe = onValue(
@@ -314,6 +337,8 @@ function runActivity(roomId, role) {
 
   return () => {
     unsubscribe();
+    unsubscribeSpeech();
+    speaker.stop();
     sparkAnimation?.cancel();
     stage.removeEventListener('pointerdown', onPointerDown);
     stage.removeEventListener('pointerup', onPointerUp);

@@ -1,5 +1,5 @@
 // Security Rules の単体テスト（エミュレータ上で実行）。
-// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、承認された追加分（11月2日：A15〜A19・D7・D8、11月3日：A20〜A24・D9〜D11）に対応する。
+// テスト番号は「Firebase 机上検証メモ v1.2」§3 と、承認された追加分（11月2日：A15〜A19・D7・D8、11月3日：A20〜A24・D9〜D11、同日夜：A25・A26・D12 読み上げ設定）に対応する。
 // C1〜C3 と A6 の表示部分は Rules では検証できないため tests/client.test.js で確認する。
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest';
@@ -323,6 +323,31 @@ describe('A. 役割と承認', () => {
     await assertFails(ref(A, roomPath('meta/expiresAt')).set(Date.now() + 1000));
     expect(await readAsAdmin(roomPath('meta'))).toEqual(before);
   });
+
+  // 読み上げのオン／オフ（meta/speech）。11月3日夜に Nishio が承認した追加分
+  test('A25 教員は読み上げ設定（meta/speech）を true／false に切り替えられ、作成時にも含められる', async () => {
+    await seed({ [ROOM]: roomData() });
+    await assertSucceeds(ref(OWNER, roomPath('meta/speech')).set(false));
+    expect(await readAsAdmin(roomPath('meta/speech'))).toBe(false);
+    await assertSucceeds(ref(OWNER, roomPath('meta/speech')).set(true));
+    await assertSucceeds(ref(OWNER, roomPath('', ROOM2)).set(newRoom({ speech: true })));
+    // 設定を書いても、他の meta やカウンタ・役割は変わらない
+    expect(await readAsAdmin(roomPath('meta/ownerUid'))).toBe(OWNER);
+    expect(await readAsAdmin(roomPath('counters'))).toEqual({ a: 0, b: 0 });
+  });
+
+  test('A26 子どもは読み上げ設定を書けず、真偽値以外・削除は教員でも拒否される', async () => {
+    await seed({ [ROOM]: roomData() });
+    await assertFails(ref(A, roomPath('meta/speech')).set(false));
+    await assertFails(ref(B, roomPath('meta/speech')).set(true));
+    await assertFails(ref(X, roomPath('meta/speech')).set(false));
+    await assertFails(ref(OWNER, roomPath('meta/speech')).set('on'));
+    await assertFails(ref(OWNER, roomPath('meta/speech')).set(1));
+    await assertFails(ref(OWNER, roomPath('meta/speech')).set(true).then(() => ref(OWNER, roomPath('meta/speech')).remove()));
+    // 読み上げ設定の書き込み権限を使って、他の meta を書き換えることはできない
+    await assertFails(ref(OWNER, roomPath('meta')).update({ speech: true, expiresAt: Date.now() + 24 * HOUR }));
+    expect(await readAsAdmin(roomPath('meta/speech'))).toBe(true);
+  });
 });
 
 describe('B. min 方式の増分条件', () => {
@@ -448,5 +473,11 @@ describe('D. 期限と終了', () => {
       }),
     );
     expect(await readAsAdmin(roomPath('roles'))).toBeNull();
+  });
+
+  test('D12 期限切れの部屋では教員も読み上げ設定を切り替えられない', async () => {
+    await seed({ [ROOM]: roomData(expired()) });
+    await assertFails(ref(OWNER, roomPath('meta/speech')).set(false));
+    expect(await readAsAdmin(roomPath('meta/speech'))).toBeNull();
   });
 });

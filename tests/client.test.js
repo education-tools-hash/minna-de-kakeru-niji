@@ -6,9 +6,12 @@ import {
   approvalMessage,
   canContribute,
   createCelebrationTracker,
+  createAnnouncer,
   createInputGate,
   freeRole,
   jointCount,
+  PHRASES,
+  statusPhrase,
   viewState,
 } from '../public/logic.js';
 
@@ -101,5 +104,36 @@ describe('光の動き（対応表 5・6・8）', () => {
   test('「視差効果を減らす」では動きを止め、明るいまま静止する', () => {
     const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
     expect(reduced).toMatch(/\.light\.held,\s*\.light\.inviting\s*{[^}]*animation:\s*none[^}]*opacity:\s*0\.9/);
+  });
+});
+
+describe('状態の言葉と読み上げ（11月3日の変更）', () => {
+  test('状態ごとの言葉：自分が待っている→できた！、相手の光が来ている→あなたの ばんだよ、虹の完成→にじが できたよ', () => {
+    expect(statusPhrase(viewState({ a: 1, b: 0 }, 'a'))).toBe('できた！');
+    expect(statusPhrase(viewState({ a: 1, b: 0 }, 'b'))).toBe('あなたの ばんだよ');
+    expect(statusPhrase(viewState({ a: 1, b: 1 }, 'a'))).toBe('にじが できたよ');
+    expect(statusPhrase(viewState({ a: 0, b: 0 }, 'a'))).toBe('ひかりを だそう');
+    // 自分が待っている言葉を、相手の光より優先する（両方待つ状態は min 方式では起きないが、順序を固定する）
+    expect(statusPhrase({ mineWaiting: true, theirsWaiting: true, rainbowComplete: true })).toBe('できた！');
+  });
+
+  test('読み上げは状態が変わったときに1回だけで、同じ状態の再描画では読まない', () => {
+    const announcer = createAnnouncer(PHRASES.start);
+    expect(announcer.next(PHRASES.start)).toBeNull();
+    expect(announcer.next(PHRASES.mine)).toBe('できた！');
+    expect(announcer.next(PHRASES.mine)).toBeNull();
+    expect(announcer.next(PHRASES.complete)).toBe('にじが できたよ');
+    expect(announcer.next(PHRASES.theirs)).toBe('あなたの ばんだよ');
+  });
+
+  test('読み込み時点の状態は読まず（静止表示）、その後の変化だけ読む', () => {
+    const announcer = createAnnouncer(PHRASES.complete);
+    expect(announcer.next(PHRASES.complete)).toBeNull();
+    expect(announcer.next(PHRASES.mine)).toBe('できた！');
+  });
+
+  test('最初の状態「ひかりを だそう」は文字だけで読み上げない', () => {
+    const announcer = createAnnouncer(PHRASES.mine);
+    expect(announcer.next(PHRASES.start)).toBeNull();
   });
 });

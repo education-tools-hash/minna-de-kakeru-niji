@@ -10,7 +10,9 @@ import {
   createInputGate,
   freeRole,
   jointCount,
+  MAX_LAYERS,
   PHRASES,
+  rainbowView,
   statusPhrase,
   viewState,
 } from '../public/logic.js';
@@ -108,19 +110,19 @@ describe('光の動き（対応表 5・6・8）', () => {
 });
 
 describe('状態の言葉と読み上げ（11月3日の変更）', () => {
-  test('状態ごとの言葉：自分が待っている→できた！、相手の光が来ている→あなたの ばんだよ、虹の完成→にじが できたよ', () => {
-    expect(statusPhrase(viewState({ a: 1, b: 0 }, 'a'))).toBe('できた！');
+  test('状態ごとの言葉：自分が待っている→できたね、相手の光が来ている→あなたの ばんだよ、虹の完成→にじが できたよ', () => {
+    expect(statusPhrase(viewState({ a: 1, b: 0 }, 'a'))).toBe('できたね');
     expect(statusPhrase(viewState({ a: 1, b: 0 }, 'b'))).toBe('あなたの ばんだよ');
     expect(statusPhrase(viewState({ a: 1, b: 1 }, 'a'))).toBe('にじが できたよ');
     expect(statusPhrase(viewState({ a: 0, b: 0 }, 'a'))).toBe('ひかりを だそう');
     // 自分が待っている言葉を、相手の光より優先する（両方待つ状態は min 方式では起きないが、順序を固定する）
-    expect(statusPhrase({ mineWaiting: true, theirsWaiting: true, rainbowComplete: true })).toBe('できた！');
+    expect(statusPhrase({ mineWaiting: true, theirsWaiting: true, rainbowComplete: true })).toBe('できたね');
   });
 
   test('読み上げは状態が変わったときに1回だけで、同じ状態の再描画では読まない', () => {
     const announcer = createAnnouncer(PHRASES.start);
     expect(announcer.next(PHRASES.start)).toBeNull();
-    expect(announcer.next(PHRASES.mine)).toBe('できた！');
+    expect(announcer.next(PHRASES.mine)).toBe('できたね');
     expect(announcer.next(PHRASES.mine)).toBeNull();
     expect(announcer.next(PHRASES.complete)).toBe('にじが できたよ');
     expect(announcer.next(PHRASES.theirs)).toBe('あなたの ばんだよ');
@@ -129,7 +131,7 @@ describe('状態の言葉と読み上げ（11月3日の変更）', () => {
   test('読み込み時点の状態は読まず（静止表示）、その後の変化だけ読む', () => {
     const announcer = createAnnouncer(PHRASES.complete);
     expect(announcer.next(PHRASES.complete)).toBeNull();
-    expect(announcer.next(PHRASES.mine)).toBe('できた！');
+    expect(announcer.next(PHRASES.mine)).toBe('できたね');
   });
 
   test('最初の状態「ひかりを だそう」は文字だけで読み上げない', () => {
@@ -146,5 +148,44 @@ describe('読み上げの声（Nishio の録音）', () => {
       expect(readFileSync(`public/${CLIPS[phrase]}`).length).toBeGreaterThan(1000);
     }
     expect(CLIPS[PHRASES.start]).toBeUndefined();
+  });
+});
+
+describe('虹の見せ方（案A：描き直し＋積み重ね）', () => {
+  test('A の参加で暖色の弧、B の参加で寒色の弧。両方そろうと完成', () => {
+    expect(rainbowView({ a: 0, b: 0 })).toEqual({ layers: 0, warm: false, cool: false, full: false });
+    expect(rainbowView({ a: 1, b: 0 })).toEqual({ layers: 0, warm: true, cool: false, full: false });
+    expect(rainbowView({ a: 0, b: 1 })).toEqual({ layers: 0, warm: false, cool: true, full: false });
+    expect(rainbowView({ a: 1, b: 1 })).toEqual({ layers: 0, warm: true, cool: true, full: true });
+  });
+
+  test('2回目以降：完成した虹は層に残り、新しい虹を描き始める', () => {
+    expect(rainbowView({ a: 2, b: 1 })).toEqual({ layers: 1, warm: true, cool: false, full: false });
+    expect(rainbowView({ a: 2, b: 2 })).toEqual({ layers: 1, warm: true, cool: true, full: true });
+    expect(rainbowView({ a: 2, b: 3 })).toEqual({ layers: 2, warm: false, cool: true, full: false });
+  });
+
+  test('層は最大3枚までで、それ以上は古いものから消える', () => {
+    expect(MAX_LAYERS).toBe(3);
+    expect(rainbowView({ a: 4, b: 4 }).layers).toBe(3);
+    expect(rainbowView({ a: 10, b: 9 }).layers).toBe(3);
+  });
+
+  test('再読み込み時：counters だけから同じ状態を復元できる（描く動きは app 側で止める）', () => {
+    expect(rainbowView({ a: 3, b: 3 })).toEqual(rainbowView({ a: 3, b: 3 }));
+    expect(rainbowView({ a: 3, b: 3 }).full).toBe(true);
+  });
+
+  const css = readFileSync(new URL('../public/style.css', import.meta.url), 'utf8');
+
+  test('弧を描く動きは2秒以上かけてゆっくり（速い動きを使わない）', () => {
+    const m = css.match(/\.rainbow path\s*{[^}]*transition:[^;]*stroke-dashoffset\s+([\d.]+)s/);
+    expect(m).not.toBeNull();
+    expect(Number(m[1])).toBeGreaterThanOrEqual(2);
+  });
+
+  test('「視差効果を減らす」では弧を描く動きを止める', () => {
+    const reduced = css.slice(css.indexOf('prefers-reduced-motion'));
+    expect(reduced).toMatch(/\.rainbow path[^{]*{[^}]*transition:\s*none/);
   });
 });

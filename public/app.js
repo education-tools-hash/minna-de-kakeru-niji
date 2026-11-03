@@ -24,7 +24,9 @@ import {
   createCelebrationTracker,
   createInputGate,
   freeRole,
+  MAX_LAYERS,
   otherRole,
+  rainbowView,
   statusPhrase,
   viewState,
 } from './logic.js';
@@ -221,7 +223,7 @@ function runActivity(roomId, role) {
   const mineLight = $(`light-${role}`);
   const theirLight = $(`light-${other}`);
   const spark = $(`spark-${role}`);
-  const rainbow = $('rainbow');
+  const rainbows = $('rainbows');
   const pulse = $('pulse');
   stage.setAttribute('aria-label', `${ROLE_LABEL[role]} の光を出す`);
   // 役割が変わって再開した場合に備え、前の表示状態を消しておく
@@ -245,8 +247,7 @@ function runActivity(roomId, role) {
     // 自分の光は呼吸（明るさ）、相手の光は揺れ（位置）で、動きの種類を分ける
     mineLight.classList.toggle('held', state.mineWaiting);
     theirLight.classList.toggle('inviting', state.theirsWaiting);
-    rainbow.classList.toggle('no-anim', !animate);
-    rainbow.classList.toggle('complete', state.rainbowComplete);
+    renderRainbow(rainbowView(counters), animate);
     const phrase = statusPhrase(state);
     $('child-status').textContent = phrase;
     // 読み上げは状態が変わったときに1回だけ。読み込み時点の言葉は読まない
@@ -273,6 +274,64 @@ function runActivity(roomId, role) {
     },
     () => show('closed'),
   );
+
+  // 虹の弧（SVG）。暖色の3本は左から、寒色の4本は右から描く。pathLength=1 なので dashoffset 1→0 で描かれる
+  const ARCS = [
+    ['warm', 95, '#e85d5d'], ['warm', 85, '#f0a03c'], ['warm', 75, '#f0d23c'],
+    ['cool', 65, '#5dc26a'], ['cool', 55, '#3cb0f0'], ['cool', 45, '#4a6ee0'], ['cool', 35, '#9a5de0'],
+  ];
+  function newRainbow() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 200 100');
+    svg.classList.add('rainbow');
+    for (const [side, r, color] of ARCS) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const d = side === 'warm'
+        ? `M ${100 - r} 100 A ${r} ${r} 0 0 1 ${100 + r} 100`
+        : `M ${100 + r} 100 A ${r} ${r} 0 0 0 ${100 - r} 100`;
+      path.setAttribute('d', d);
+      path.setAttribute('pathLength', '1');
+      path.setAttribute('stroke', color);
+      path.classList.add(side);
+      svg.append(path);
+    }
+    return svg;
+  }
+
+  // 案A：描き直し＋積み重ね。counters から決まる見た目（rainbowView）に DOM を合わせる。
+  // animate=false（読み込み時）は完成した状態を一度に作り、描く動きを再演しない。
+  let layers = []; // 新しい順
+  let current = null;
+  function renderRainbow(view, animate) {
+    rainbows.classList.toggle('no-anim', !animate);
+    if (!animate || !current || view.layers < layers.length) {
+      rainbows.replaceChildren();
+      layers = [];
+      for (let i = 0; i < view.layers; i++) {
+        const layer = newRainbow();
+        layer.classList.add('layer');
+        layers.push(layer);
+        rainbows.append(layer);
+      }
+      current = newRainbow();
+      rainbows.append(current);
+    }
+    // 虹が完成して次が始まった：今の虹を層に降ろし、新しい虹を描き始める
+    while (layers.length < view.layers) {
+      current.classList.add('layer');
+      layers.unshift(current);
+      current = newRainbow();
+      rainbows.append(current);
+    }
+    while (layers.length > MAX_LAYERS) {
+      const oldest = layers.pop();
+      oldest.classList.add('fading');
+      setTimeout(() => oldest.remove(), 2500);
+    }
+    layers.forEach((layer, i) => layer.setAttribute('data-depth', String(i + 1)));
+    current.classList.toggle('warm', view.warm);
+    current.classList.toggle('cool', view.cool);
+  }
 
   function playPulse() {
     pulse.classList.remove('play');

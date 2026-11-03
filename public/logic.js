@@ -67,7 +67,7 @@ export function createInputGate(windowMs = CLICK_DEDUPE_MS) {
 // 子ども画面の状態の言葉（11月3日に Nishio が確定）。短い言葉だけにし、読み上げにも使う。
 // start（最初の状態）は文字だけで、読み上げない。
 export const PHRASES = {
-  mine: 'できた！',
+  mine: 'できたね',
   theirs: 'あなたの ばんだよ',
   complete: 'にじが できたよ',
   start: 'ひかりを だそう',
@@ -90,5 +90,25 @@ export function createAnnouncer(initialPhrase) {
       last = phrase;
       return SPOKEN.has(phrase) ? phrase : null;
     },
+  };
+}
+
+// 虹の見せ方（案A、11月3日に Nishio が決定）：A の参加で暖色の弧、B の参加で寒色の弧を、その都度新しく描く。
+// 完成した虹は薄い層として残し、新しい虹と重なって二重・三重に見える。層は MAX_LAYERS 枚までで、古いものから消える。
+// counters だけから決まるので、再読み込み時も同じ状態を（描く動きなしで）表示できる。
+export const MAX_LAYERS = 3;
+
+export function rainbowView(counters) {
+  const a = counters.a ?? 0;
+  const b = counters.b ?? 0;
+  const joint = Math.min(a, b);
+  const inProgress = a > joint || b > joint; // 次の虹を描いている途中
+  const completed = inProgress ? joint : Math.max(0, joint - 1); // 層になる完成済みの虹の数（表示中の虹は除く）
+  const full = !inProgress && joint >= 1; // 表示中の虹が完成している
+  return {
+    layers: Math.min(completed, MAX_LAYERS),
+    warm: a > joint || full,
+    cool: b > joint || full,
+    full,
   };
 }

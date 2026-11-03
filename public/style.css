@@ -102,32 +102,46 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.35) 30%, transparent 55%);
 }
 
-.rainbow {
+/* 虹（案A）：A の参加で暖色の弧が左から、B の参加で寒色の弧が右から、ゆっくり描かれる。
+   完成した虹は薄い層として後ろに残り、少し大きくなって二重・三重に見える（最大3枚、古いものから消える）。 */
+.rainbows {
   position: absolute;
   left: 50%;
   bottom: 18%;
   width: 70%;
   aspect-ratio: 2 / 1;
-  transform: translateX(-50%) scale(0.9);
-  opacity: 0;
-  transition: opacity 1.2s ease, transform 1.2s ease;
+  transform: translateX(-50%);
 }
-.rainbow span {
+.rainbow {
   position: absolute;
   inset: 0;
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-  border: 10px solid transparent;
-  border-bottom: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 100%;
+  transition: opacity 2s ease, transform 2s ease;
 }
-.rainbow span:nth-child(1) { border-color: #e85d5d; }
-.rainbow span:nth-child(2) { inset: 10px 10px 0; border-color: #f0a03c; }
-.rainbow span:nth-child(3) { inset: 20px 20px 0; border-color: #f0d23c; }
-.rainbow span:nth-child(4) { inset: 30px 30px 0; border-color: #5dc26a; }
-.rainbow span:nth-child(5) { inset: 40px 40px 0; border-color: #3cb0f0; }
-.rainbow span:nth-child(6) { inset: 50px 50px 0; border-color: #4a6ee0; }
-.rainbow span:nth-child(7) { inset: 60px 60px 0; border-color: #9a5de0; }
-.rainbow.complete { opacity: 1; transform: translateX(-50%) scale(1); }
-.rainbow.no-anim { transition: none; }
+.rainbow path {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: butt;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 2.8s ease-in-out;
+}
+.rainbow .warm:nth-child(2), .rainbow .cool:nth-child(5) { transition-delay: 0.35s; }
+.rainbow .warm:nth-child(3), .rainbow .cool:nth-child(6) { transition-delay: 0.7s; }
+.rainbow .cool:nth-child(7) { transition-delay: 1.05s; }
+.rainbow.warm .warm, .rainbow.cool .cool, .rainbow.layer path { stroke-dashoffset: 0; transition-delay: 0s; }
+.rainbow.warm .warm:nth-child(2), .rainbow.cool .cool:nth-child(5) { transition-delay: 0.35s; }
+.rainbow.warm .warm:nth-child(3), .rainbow.cool .cool:nth-child(6) { transition-delay: 0.7s; }
+.rainbow.cool .cool:nth-child(7) { transition-delay: 1.05s; }
+.rainbow.layer path { transition-delay: 0s; }
+.rainbow[data-depth="1"] { opacity: 0.4; transform: scale(1.05); }
+.rainbow[data-depth="2"] { opacity: 0.26; transform: scale(1.1); }
+.rainbow[data-depth="3"] { opacity: 0.14; transform: scale(1.15); }
+.rainbow.fading { opacity: 0; transform: scale(1.2); }
+.rainbows.no-anim .rainbow, .rainbows.no-anim .rainbow path { transition: none; }
 
 /* 共同変化（初期版は1種類）：虹の上に光の輪が広がる。点滅はしない。 */
 .pulse {
@@ -162,6 +176,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
   .light.held, .light.inviting { animation: none; opacity: 0.9; }
+  .rainbow, .rainbow path { transition: none; }
   .pulse.play { animation-duration: 0.01s; }
 }
 

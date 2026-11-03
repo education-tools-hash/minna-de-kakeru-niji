@@ -137,3 +137,14 @@ describe('状態の言葉と読み上げ（11月3日の変更）', () => {
     expect(announcer.next(PHRASES.start)).toBeNull();
   });
 });
+
+describe('読み上げの声（Nishio の録音）', () => {
+  test('読み上げる3つの言葉それぞれに録音ファイルがあり、最初の状態には無い', async () => {
+    const { CLIPS } = await import('../public/speech.js');
+    for (const phrase of [PHRASES.mine, PHRASES.theirs, PHRASES.complete]) {
+      expect(CLIPS[phrase]).toMatch(/^audio\/.+\.m4a$/);
+      expect(readFileSync(`public/${CLIPS[phrase]}`).length).toBeGreaterThan(1000);
+    }
+    expect(CLIPS[PHRASES.start]).toBeUndefined();
+  });
+});

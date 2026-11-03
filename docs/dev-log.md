@@ -113,3 +113,5 @@
   - 先生がオフ → 子どもの操作で状態が変わっても読まない。オンに戻すと再開。
   - B を再読み込み（役割は保持）→ Space キー → 解除と「できた！」、A に「あなたの ばんだよ」。コンソールのエラーなし。
 - **未実施**：iPad 実機での読み上げ（本番に公開してから Nishio が確認）、キー入力だけでの解除、VoiceOver との二重読み（`child-status` は `aria-live="polite"` のまま）。本番への公開（Rules の変更を含む）は Nishio の判断待ち。
+- 本番への公開（Nishio の承認後）：(1) Rules をデプロイ（`--project prod`）→ (2) デプロイされた Rules を取得してコミット済みのファイル（`84cff97`、`meta/speech` を含む）と JSON として完全一致を照合 → (3) `scripts/prod_smoke.py` 11件すべて期待どおり（`niji-shots/20261103-1230_prod-rules-smoke_commit24f5a57.log`）→ (4) Hosting をデプロイし、配信された `speech.js`・`app.js`・`index.html`・`logic.js` のハッシュがローカルと一致することを確認。コミット `24f5a57` を push した。
+- 公開後の iPad 実機での読み上げの確認は**未実施**（Nishio が行う。一度開いた端末では CSS・JS が最大1時間キャッシュされるため、再読み込みが必要）。

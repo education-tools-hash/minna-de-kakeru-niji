@@ -168,4 +168,5 @@
   - **解除の画面**：役割を失って参加希望が通った場合は「先生が参加を解除しました。もう一度承認されるまで待ってください」（`released`）。初回の承認待ちと区別できる。純粋ロジック `roleLossScreen` とテスト3件（クライアント 30件通過）。
   - **キャッシュ**：`firebase.json` に headers を追加。`/`・`/index.html` は `no-cache`、JS・CSS・音声は `max-age=600`。エミュレータでヘッダを確認。
 - 確認（エミュレータ、ブラウザの3タブ。実機ではない）：解除 → 子どもは `released`（「先生が参加を解除しました。」）→ 再承認で活動へ。活動を終える → 子ども2人とも `ended`、先生も `ended`。
-- 公開：Rules のデプロイも自動モードの安全判定（Production Deploy）で止められたため、Rules → 照合 → smoke → Hosting の順で、デプロイのコマンドは Nishio が実行し、照合と smoke は Claude Code が行う。コミット `58e24d8` を push した。
+- 公開：Rules・Hosting のデプロイは自動モードの安全判定（Production Deploy）で止められたため、デプロイのコマンドは Nishio がターミナルで実行し、照合と smoke は Claude Code が行った。順序：(1) Rules をデプロイ → (2) 本番の Rules がコミット済みファイル（`ba08c6a`、`meta/endedAt` を含む）と完全一致 → (3) `prod_smoke.py` 11件すべて期待どおり（`niji-shots/20261103-2137_prod-rules-smoke_commit58e24d8.log`）→ (4) Hosting をデプロイし、配信された `app.js`・`logic.js`・`index.html`・`style.css`・`speech.js` のハッシュがローカルと一致、新しいキャッシュヘッダ（`/`・`/index.html` は `no-cache`、JS・CSS・音声は `max-age=600`）が効いていることを確認。コミット `58e24d8` を push した。
+- **未実施**：実機での再確認（活動中に先生が「活動を終える」→ 子どもの画面が「先生が活動を終えました」になること。解除 → 「先生が参加を解除しました」になること）。今回の公開以降は、`index.html` は再読み込みで必ず最新になり、JS は最長10分で入れ替わる。

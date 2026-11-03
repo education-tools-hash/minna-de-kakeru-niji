@@ -67,7 +67,7 @@ export function createInputGate(windowMs = CLICK_DEDUPE_MS) {
 // 子ども画面の状態の言葉（11月3日に Nishio が確定）。短い言葉だけにし、読み上げにも使う。
 // start（最初の状態）は文字だけで、読み上げない。
 export const PHRASES = {
-  mine: 'できたね',
+  mine: 'ひかったね',
   theirs: 'あなたの ばんだよ',
   complete: 'にじが できたよ',
   start: 'ひかりを だそう',

@@ -1,16 +1,17 @@
 # 先生の録音（m4a）を、読み上げ用の音声に整える。
 # 使い方: python3 scripts/prepare_voice.py 入力1.m4a 入力2.m4a 入力3.m4a（3つまとめて）
-#        python3 scripts/prepare_voice.py --name dekita 入力.m4a（1つだけ）
+#        python3 scripts/prepare_voice.py --name hikatta 入力.m4a（1つだけ）
 # 処理: 前後の無音を切る → 短い余白と フェードを付ける → 3つの音量（RMS）をそろえる → AAC（m4a）で書き出す。
 # ffmpeg は使わず、macOS 付属の afconvert と Python 標準ライブラリだけで処理する。
 import array, math, struct, subprocess, sys, tempfile, wave
 from pathlib import Path
 
 OUT_DIR = Path(__file__).resolve().parent.parent / 'public' / 'audio'
-NAMES = ['dekita', 'anata-no-ban', 'niji-ga-dekita']  # できたね／あなたの ばんだよ／にじが できたよ
+NAMES = ['hikatta', 'anata-no-ban', 'niji-ga-dekita']  # ひかったね／あなたの ばんだよ／にじが できたよ
 RATE = 48000
 SPEECH_DB = -30.0       # これより大きい区間を声の本体とみなす（ピーク比）
 SILENCE_DB = -45.0      # 本体に隣接して、これより大きい間は声の続きとみなす（語尾の弱い音を切らない）
+NOISE_MARGIN_DB = 8.0   # 暗騒音よりこれだけ大きい音だけを声の続きとみなす
 PAD_MS = 100            # 前後に残す余白
 FADE_MS = 12            # クリック音を防ぐフェード
 TARGET_RMS_DB = -20.0   # 3つの音量をそろえる基準
@@ -48,7 +49,11 @@ def trim(s):
     peak = max(abs(x) for x in s)
     win = RATE // 100
     levels = [max(abs(x) for x in s[i:i + win]) / peak for i in range(0, len(s) - win, win)]
-    hi = 10 ** (SPEECH_DB / 20); lo = 10 ** (SILENCE_DB / 20)
+    hi = 10 ** (SPEECH_DB / 20)
+    # 広げる基準は、ピーク比 SILENCE_DB と「録音の暗騒音（レベルの中央値）＋ NOISE_MARGIN_DB」の大きいほう。
+    # 暗騒音が大きい録音で、声の前後の雑音まで含めてしまわないため。
+    floor = sorted(levels)[len(levels) // 2]
+    lo = max(10 ** (SILENCE_DB / 20), floor * 10 ** (NOISE_MARGIN_DB / 20))
     runs = []  # [start, end) in windows
     for i, v in enumerate(levels):
         if v <= hi: continue
@@ -79,7 +84,7 @@ def main(args):
     if args[:1] == ['--name']:
         pairs = [(args[2], args[1])]
     else:
-        assert len(args) == 3, '入力は3ファイル（できたね／あなたの ばんだよ／にじが できたよ の順）'
+        assert len(args) == 3, '入力は3ファイル（ひかったね／あなたの ばんだよ／にじが できたよ の順）'
         pairs = list(zip(args, NAMES))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:

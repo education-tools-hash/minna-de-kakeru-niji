@@ -183,3 +183,31 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 先生画面：読み上げのオン／オフ */
 .toggle { display: flex; gap: .6em; align-items: flex-start; font-size: 1.05rem; line-height: 1.5; }
 .toggle input { width: 1.4em; height: 1.4em; flex: none; margin-top: .15em; }
+
+/* 先生画面（対応表 10）：操作部品を大きく、キーボードだけで操作でき、フォーカスがはっきり見える。
+   子ども画面には影響しない（#teacher の中だけ）。 */
+#teacher button {
+  min-height: 64px;
+  padding: 0 28px;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+#teacher .role-list li, #teacher .request-list li { padding: 12px 16px; flex-wrap: wrap; }
+#teacher .role-list li > span, #teacher .request-list li > span { font-size: 1.15rem; font-weight: 600; flex: 1 1 10em; }
+#teacher .request-list li button { flex: 1 1 12em; }
+#teacher .join-url { font-size: 1.2rem; }
+#teacher .join-url a { display: inline-block; padding: 8px 4px; }
+#teacher .toggle { font-size: 1.15rem; }
+#teacher .toggle input { width: 1.8em; height: 1.8em; margin-top: 0.05em; }
+#teacher :focus-visible {
+  outline: 4px solid var(--cool);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+#teacher h1:focus-visible { outline-offset: 6px; }
+/* 誤操作防止：活動を終えるボタンは、他の操作から離し、区切り線の下に置く */
+#teacher .end-area { margin-top: 3em; padding-top: 1.5em; border-top: 2px solid var(--line); }
+#teacher #end-room { margin-top: 0; }
+@media (max-width: 600px) {
+  #teacher .role-list li button, #teacher .request-list li button { width: 100%; }
+}

@@ -101,6 +101,8 @@ async function createRoom(uid) {
 
 function runTeacher(roomId) {
   show('teacher');
+  // キーボード操作：Tab が画面の先頭から始まるよう、見出しにフォーカスを置く
+  $('teacher-title').focus();
   const joinUrl = `${location.origin}${location.pathname}?room=${roomId}`;
   $('join-url').href = joinUrl;
   $('join-url').textContent = joinUrl;
@@ -120,6 +122,8 @@ function runTeacher(roomId) {
       $('speech-toggle').checked = room.meta.speech !== false;
       $('expires').textContent = `有効期限：${new Date(room.meta.expiresAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} まで`;
 
+      // リストを作り直すと、キーボードで当てていたフォーカスが消える。ボタンに安定した id を付け、作り直したあとに戻す
+      const focusedId = document.activeElement?.id;
       $('role-list').replaceChildren(
         ...['a', 'b'].map((role) => {
           const li = document.createElement('li');
@@ -128,9 +132,13 @@ function runTeacher(roomId) {
           li.append(label);
           if (roles[role]) {
             const release = document.createElement('button');
+            release.id = `release-${role}`;
             release.textContent = `${ROLE_LABEL[role]} を解除`;
-            release.onclick = () =>
+            // 誤操作防止：確認ダイアログ（Enter で確定、Esc で取りやめ）
+            release.onclick = () => {
+              if (!confirm(`${ROLE_LABEL[role]} の参加を解除しますか？（子どもの画面には「先生が参加を解除しました」と出ます）`)) return;
               update(ref(db, `rooms/${roomId}`), { [`roles/${role}`]: null, [`members/${roles[role]}`]: null });
+            };
             li.append(release);
           }
           return li;
@@ -148,6 +156,7 @@ function runTeacher(roomId) {
           label.textContent = `参加希望 ${i + 1}`;
           const approve = document.createElement('button');
           const role = freeRole(roles);
+          approve.id = `approve-${uid}`;
           approve.textContent = role ? `承認して ${ROLE_LABEL[role]} にする` : '満員';
           approve.disabled = !role;
           approve.onclick = () =>
@@ -157,12 +166,21 @@ function runTeacher(roomId) {
               [`members/${uid}`]: role,
             });
           const reject = document.createElement('button');
+          reject.id = `reject-${uid}`;
           reject.textContent = '見送る';
-          reject.onclick = () => remove(ref(db, `rooms/${roomId}/requests/${uid}`));
+          // 誤操作防止：確認ダイアログ
+          reject.onclick = () => {
+            if (!confirm(`参加希望 ${i + 1} を見送りますか？（子どもの画面は「参加できません」になります）`)) return;
+            remove(ref(db, `rooms/${roomId}/requests/${uid}`));
+          };
           li.append(label, approve, reject);
           return li;
         }),
       );
+      // フォーカスを同じボタンに戻す。そのボタンが消えていれば見出しに戻す（キーボード操作が迷子にならない）
+      if (focusedId && (focusedId.startsWith('release-') || focusedId.startsWith('approve-') || focusedId.startsWith('reject-'))) {
+        ($(focusedId) ?? $('teacher-title')).focus();
+      }
 
       const state = viewState(counters, 'a');
       $('teacher-status').textContent =

@@ -205,3 +205,4 @@
 - 【2】先生画面の既存の注意書き（アドレスバーの URL の件）の直後に「生徒が変わるときは、活動を終えて新しい部屋を作ってください。新しい部屋では、最初から始まります。」を追加。他の文言は変えていない。
 - コミットのみ（push・公開はしていない）。iPad での再確認用に、Mac から `public/` を同じ Wi‑Fi に配信する方法を Nishio に示した（ホスト名が localhost ではないため本番の Firebase に接続する。Hosting には公開しない）。
 - **iPad 実機での再確認（Nishio）**：「ひかったね」の聞き取りづらさは解消。もう一台で最初の「あなたの ばんだよ」が流れなかった件は、未操作の端末では音声を再生できない iOS の仕様どおりの挙動と判断（問題なし）。Nishio の承認を得て、コミット `b8b8337` を Hosting のみ公開する（Rules は無変更）。
+- 公開（Hosting のみ）：デプロイは Nishio がターミナルで実行し、Claude Code が照合した。配信された `speech.js`・`index.html`・`app.js`・`logic.js`・`style.css`・`audio/hikatta.m4a` のハッシュがローカル（`b8b8337`）と一致、キャッシュヘッダは `/` が `no-cache`、JS が `max-age=600`、新しい注意書きが配信されている。`prod_smoke.py` は 11件すべて期待どおり（`niji-shots/20261105-0940_prod-rules-smoke_commitb8b8337.log`）。

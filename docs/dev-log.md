@@ -206,3 +206,9 @@
 - コミットのみ（push・公開はしていない）。iPad での再確認用に、Mac から `public/` を同じ Wi‑Fi に配信する方法を Nishio に示した（ホスト名が localhost ではないため本番の Firebase に接続する。Hosting には公開しない）。
 - **iPad 実機での再確認（Nishio）**：「ひかったね」の聞き取りづらさは解消。もう一台で最初の「あなたの ばんだよ」が流れなかった件は、未操作の端末では音声を再生できない iOS の仕様どおりの挙動と判断（問題なし）。Nishio の承認を得て、コミット `b8b8337` を Hosting のみ公開する（Rules は無変更）。
 - 公開（Hosting のみ）：デプロイは Nishio がターミナルで実行し、Claude Code が照合した。配信された `speech.js`・`index.html`・`app.js`・`logic.js`・`style.css`・`audio/hikatta.m4a` のハッシュがローカル（`b8b8337`）と一致、キャッシュヘッダは `/` が `no-cache`、JS が `max-age=600`、新しい注意書きが配信されている。`prod_smoke.py` は 11件すべて期待どおり（`niji-shots/20261105-0940_prod-rules-smoke_commitb8b8337.log`）。
+
+### 凍結の仕上げ（Nishio の指示）
+- MIT ライセンスの `LICENSE` を追加して push した（アプリのコード・文言には触れていない。著作権表示は GitHub のアカウント名 `education-tools-hash`。変更する場合は Nishio が書き換える）。コミット `91ea738`。
+- その時点の main（`91ea738`）に凍結時点の安定版としてタグ `stable-2026-11-05` を付けて push した。
+- 照合：タグの指すコミットの `public/`・`database.rules.json`・`firebase.json` は、本番に公開したコミット `b8b8337` と差分なし。本番 Hosting が配信している `index.html`・`app.js`・`logic.js`・`speech.js`・`style.css`・`firebase-config.js`・音声3ファイルのハッシュは、タグの内容と**すべて一致**。本番の Rules もタグの `database.rules.json` と**完全一致**。
+- これ以降、機能追加は行わない。重大な不具合が見つかった場合のみ、Nishio が別途指示する。

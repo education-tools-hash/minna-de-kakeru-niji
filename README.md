@@ -4,7 +4,7 @@
 
 ![iPad と Mac の両方に完成した虹が表示されている写真](docs/images/main-photo.jpg)
 
-デモ動画：https://www.youtube.com/watch?v=BYpMC6gRlEw
+デモ動画：https://www.youtube.com/watch?v=dlRCTWqG2Q4
 
 二人の子どもが別々の端末から働きかけ、一つの虹を完成させる共同制作Webアプリです。一人が何度・どれだけ速く操作しても、もう一人が一度も働きかけなければ、虹は完成しません。操作能力の差を、参加価値の差に変換しない——この考え方を「対等参加プロトコル」と呼び、作品の中心に置きました。
 

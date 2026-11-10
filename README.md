@@ -1,6 +1,7 @@
 # Minna de Kakeru Niji — A Rainbow We Draw Together
 
 **Live app:** https://minna-de-kakeru-niji.web.app
+
 **Demo video (Japanese, 2:59):** https://www.youtube.com/watch?v=dlRCTWqG2Q4
 
 A collaborative web app where two children, each on their own device, draw a rainbow together. No matter how fast or how often one child interacts, the rainbow is completed only when *both* children have taken part. A single, slow action from a child who needs time carries exactly the same weight as many quick ones.

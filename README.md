@@ -1,3 +1,35 @@
+# Minna de Kakeru Niji — A Rainbow We Draw Together
+
+**Live app:** https://minna-de-kakeru-niji.web.app
+**Demo video (Japanese, 2:59):** https://www.youtube.com/watch?v=dlRCTWqG2Q4
+
+A collaborative web app where two children, each on their own device, draw a rainbow together. No matter how fast or how often one child interacts, the rainbow is completed only when *both* children have taken part. A single, slow action from a child who needs time carries exactly the same weight as many quick ones.
+
+## The Equal Participation Protocol
+
+The app turns the difference in how children interact into *no* difference in the value of their participation:
+
+- Each child has their own participation counter. A rainbow completes when the *smaller* of the two counts increases — so neither child can move ahead alone by more than one step.
+- This rule is enforced twice: in the client logic and in the Firebase Security Rules.
+- During development, testing caught a real flaw: the teacher role could write to a child's counter, which would have allowed an adult to participate *for* a child. The teacher's permissions were restricted to management only (approving participants, sound settings, ending the session), and a regression test was added. Automated tests: 51 security-rule tests and 30 client tests, all passing — including mutation checks on the rules.
+
+## Designed for diverse input
+
+- Input: touch, swipe, keyboard, Bluetooth switch (AbleNet Blue2), eye-gaze input (Tobii)
+- Assistive technologies verified on real devices: iPad Switch Control and VoiceOver
+- The visuals rely on gentle light and position rather than rapid flashing, and status is conveyed by the movement of light first — short text and the teacher-developer's own recorded voice are supporting cues. No synthesized speech is used.
+
+## Privacy and safety
+
+- No personal information is collected. Children join a room created and approved by their teacher; rooms expire after at most 3 hours.
+- Built with Firebase Realtime Database, Anonymous Authentication, and Security Rules.
+
+## About the developer
+
+Built by a special-education teacher in Japan who does not write code, developed together with Claude Code during *Built with Claude: Japan 2026*. The project will continue as a free teaching material on [donomana.jp](https://donomana.jp), a free digital learning-materials site for children with diverse needs.
+
+---
+
 # みんなでかける虹
 
 ちがう動きが、ひとつの虹になる。
